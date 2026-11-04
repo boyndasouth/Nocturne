@@ -45,6 +45,7 @@ async def chat(req: ChatRequest, c: ContainerDep) -> ChatResponse:
         result = await c.responder.respond(req.message, occurred_at=req.occurred_at)
     except LLMError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"LLM provider error: {exc}") from exc
+    assert result.episode_id is not None  # remember=True always writes the turn
     return ChatResponse(
         answer=result.answer,
         citations=[CitationOut(ref=ci.ref, note_id=ci.note_id) for ci in result.citations],

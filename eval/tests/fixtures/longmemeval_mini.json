@@ -1,0 +1,60 @@
+[
+  {
+    "question_id": "ku_001",
+    "question_type": "knowledge-update",
+    "question": "Which city do I live in now?",
+    "answer": "Dallas",
+    "question_date": "2023/06/10 (Sat) 09:00",
+    "haystack_session_ids": ["s_dallas", "s_austin"],
+    "haystack_dates": ["2023/05/20 (Sat) 18:30", "2023/01/14 (Sat) 10:05"],
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "Quick update: I moved to Dallas last week for my new job.", "has_answer": true},
+        {"role": "assistant", "content": "Congratulations on the move to Dallas!"}
+      ],
+      [
+        {"role": "user", "content": "I live in Austin and I'm looking for good coffee shops nearby."},
+        {"role": "assistant", "content": "Austin has plenty. Try a few on South Congress."},
+        {"role": "user", "content": "Thanks! Also, I'm studying linear algebra this semester."},
+        {"role": "assistant", "content": "Good luck with linear algebra."}
+      ]
+    ],
+    "answer_session_ids": ["s_dallas"]
+  },
+  {
+    "question_id": "tr_002",
+    "question_type": "temporal-reasoning",
+    "question": "How many days before my exam did I start the study group?",
+    "answer": "4 days",
+    "question_date": "2023/03/20 (Mon) 12:00",
+    "haystack_session_ids": ["s_group", "s_exam"],
+    "haystack_dates": ["2023/03/06 (Mon) 19:00", "2023/03/10 (Fri) 08:00"],
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I started a study group for my probability class today.", "has_answer": true},
+        {"role": "assistant", "content": "Nice, study groups help a lot."}
+      ],
+      [
+        {"role": "user", "content": "My probability exam is today, wish me luck.", "has_answer": true},
+        {"role": "assistant", "content": "Good luck!"}
+      ]
+    ],
+    "answer_session_ids": ["s_group", "s_exam"]
+  },
+  {
+    "question_id": "ssu_003_abs",
+    "question_type": "single-session-user",
+    "question": "What is the name of my dog?",
+    "answer": "The user never mentioned having a dog; they mentioned a cat named Miso.",
+    "question_date": "2023/04/02 (Sun) 15:45",
+    "haystack_session_ids": ["s_cat"],
+    "haystack_dates": ["2023/04/01 (Sat) 21:10"],
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "My cat Miso keeps sitting on my keyboard while I code."},
+        {"role": "assistant", "content": "Cats love warm keyboards."}
+      ]
+    ],
+    "answer_session_ids": ["s_cat"]
+  }
+]

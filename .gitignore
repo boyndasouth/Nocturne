@@ -10,3 +10,7 @@ __pycache__/
 node_modules/
 dist/
 .DS_Store
+
+# Eval: downloaded benchmarks and the LLM response cache (results/ is committed)
+eval/datasets/data/
+eval/.cache/

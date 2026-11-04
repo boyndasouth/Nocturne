@@ -1,5 +1,7 @@
 # Optional local Postgres + pgvector (needs Docker Desktop on Windows). Not required if you
-# use Supabase or Neon. Creates two databases: `nocturne` (dev) and `nocturne_test` (tests).
+# use Supabase or Neon. Creates `nocturne` (dev), `nocturne_test` (tests)
+# and `nocturne_eval` (eval harness). The init script only runs on a fresh volume; on an
+# existing one: docker compose exec db createdb -U nocturne nocturne_eval
 services:
   db:
     image: pgvector/pgvector:pg16

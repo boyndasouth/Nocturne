@@ -32,7 +32,8 @@ class ChatResult:
     answer: str
     citations: list[Citation]
     retrieved: list[ScoredNote]
-    episode_id: UUID
+    episode_id: UUID | None  # None when respond(remember=False)
+    context: str = ""  # the memory block the LLM saw (eval logs its size)
 
 
 def _preview(note: MemoryNote) -> str:
@@ -133,7 +134,12 @@ class Responder:
         self._eta = reinforce_eta
         self._max_tokens = max_tokens
 
-    async def respond(self, message: str, *, occurred_at: datetime | None = None) -> ChatResult:
+    async def respond(
+        self, message: str, *, occurred_at: datetime | None = None, remember: bool = True
+    ) -> ChatResult:
+        """`remember=False` answers without side effects: no episode is written and no note
+        is reinforced. The eval harness uses it so benchmark questions don't become memories
+        (LoCoMo asks ~200 questions per conversation) or shift strength-based scoring."""
         now = occurred_at or datetime.now(UTC)
         with self._tracer.observe("chat", as_type="agent", input={"message": message}) as obs:
             retrieved = await self._retriever.retrieve(message, now=now, as_of=occurred_at)
@@ -158,17 +164,28 @@ class Responder:
                 )
             except LLMError:
                 # Never lose user input: log the turn without an answer, then surface the error.
-                await self._writer.write_turn(message, None, occurred_at=now)
+                if remember:
+                    await self._writer.write_turn(message, None, occurred_at=now)
                 raise
 
             citations = extract_citations(resp.text, refmap)
-            await self._store.reinforce([c.note_id for c in citations], now=now, eta=self._eta)
-            episode = await self._writer.write_turn(message, resp.text, occurred_at=now)
+            episode_id: UUID | None = None
+            if remember:
+                await self._store.reinforce([c.note_id for c in citations], now=now, eta=self._eta)
+                episode = await self._writer.write_turn(message, resp.text, occurred_at=now)
+                episode_id = episode.id
 
             obs.update(
                 output={"answer": resp.text, "cited": [str(c.note_id) for c in citations]},
-                metadata={"retrieved": len(retrieved), "episode_id": str(episode.id)},
+                metadata={
+                    "retrieved": len(retrieved),
+                    "episode_id": str(episode_id) if episode_id else None,
+                },
             )
             return ChatResult(
-                answer=resp.text, citations=citations, retrieved=retrieved, episode_id=episode.id
+                answer=resp.text,
+                citations=citations,
+                retrieved=retrieved,
+                episode_id=episode_id,
+                context=memories,
             )

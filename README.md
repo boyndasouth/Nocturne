@@ -3,9 +3,10 @@
 A long-term memory agent. A fast online agent answers questions; an offline "sleep" agent
 consolidates, links, corrects, and prunes memories between sessions.
 
-**Status: Phase 2 (sleep cycle v1).** Chat with episode memory and hybrid retrieval, plus
-a checkpointed LangGraph sleep cycle that extracts facts, merges duplicates, and supersedes
-contradicted facts with bitemporal history. Linking, themes, and forgetting arrive in Phase 3.
+**Status: Phase 3, step 1 of 4 (eval harness + baselines).** Chat with episode memory and
+hybrid retrieval, a checkpointed LangGraph sleep cycle that extracts facts, merges duplicates,
+and supersedes contradicted facts with bitemporal history, and a benchmark harness that
+compares it against baselines. Linking, themes, and forgetting come next in Phase 3.
 
 ## What works now
 
@@ -20,6 +21,7 @@ contradicted facts with bitemporal history. Linking, themes, and forgetting arri
 | Versioned edits: full-row JSON snapshot before every change; `supersedes` links; valid time vs. transaction time | `backend/app/memory/store.py`, `migrations/002_sleep_cycle.sql` |
 | `POST /sleep`, `GET /sleep/cycles[/{id}]`, idle/backlog trigger, GitHub Actions cron | `backend/app/api/sleep.py`, `backend/app/agents/sleep/trigger.py`, `.github/workflows/sleep-cron.yml` |
 | Responder sees current facts, plus the older facts they replaced, with dates | `backend/app/agents/responder.py` |
+| Eval harness: LongMemEval + LoCoMo loaders, 4 systems, official LongMemEval judge rubrics, resumable runs, LLM response cache, CSV reports | `eval/` |
 
 ## Setup (Windows, PowerShell)
 
@@ -81,9 +83,57 @@ it: the server sleeps on its own after `SLEEP_IDLE_MINUTES` idle (with at least
 For benchmark replay, pass `{"occurred_at": "..."}` to `/sleep` as well as `/chat`: facts are
 recorded at that time, so replayed questions can't see facts from the future.
 
+## Evaluation
+
+The harness replays a benchmark's history, builds each system's memory, asks the questions,
+and has an LLM judge grade the answers (spec §9). Every system answers with the same model
+and the same Responder prompt, so the only difference between rows is the memory.
+
+| System | Memory |
+|---|---|
+| `full-context` | Raw history in the prompt, newest first until `EVAL_FULL_CONTEXT_TOKENS` |
+| `naive-rag` | One chunk per turn, top-k cosine, nothing else |
+| `nocturne-no-sleep` | The real retriever (hybrid + §5 scoring + recent turns) over episodes |
+| `nocturne` | The same, after a sleep cycle at the end of every session |
+
+```powershell
+docker compose up -d                 # creates the nocturne_eval database (see docker-compose.yml)
+$env:EVAL_DATABASE_URL = "postgresql://nocturne:nocturne@localhost:5432/nocturne_eval"
+python eval/run_eval.py --limit 30 --plan          # what it will cost, spends nothing
+python eval/run_eval.py --limit 30 --fake          # offline dry run: no keys, no quota
+python eval/run_eval.py --limit 30                 # the real thing (LongMemEval oracle)
+python eval/run_eval.py --limit 30 --report-only --sample 20   # CSVs + 20 verdicts to hand-check
+```
+
+Results land in `eval/results/<run>/`: `summary.csv` (accuracy per system × category),
+`totals.csv` (overall and task-averaged accuracy, retrieval p50/p95, tokens online vs.
+offline, memory items per episode), `results.csv` (every answer with its verdict), and
+`conversations.csv` (memory size and sleep work per conversation).
+
+- **Resumable.** Rows are appended as they finish. Rerun the same command after a rate limit
+  or Ctrl-C and it picks up where it stopped; every LLM call is cached in `eval/.cache/`, so
+  finished work (including sleep cycles) is free the second time.
+- **Fair splits.** Each question is assigned to `dev` (20%) or `test` by a hash of its id.
+  Tune on `--split dev`, report on `--split test` (spec §11).
+- **Guarded.** A run refuses to continue with a different model or setting (`config.json`
+  holds the fingerprint), and the eval database must have "eval" in its name because it's
+  wiped before every conversation. Never point it at your real memory.
+- **Three quota buckets.** Answers use the online model (Groq), sleep uses Gemini, and the
+  judge defaults to Groq `openai/gpt-oss-20b`, which has its own limits separate from the
+  answer model. Override with `EVAL_JUDGE_PROVIDER` / `EVAL_JUDGE_MODEL`.
+- **Datasets** download on first use into `eval/datasets/data/` (`--data-path` uses a local
+  copy). Start with `longmemeval-oracle` (evidence sessions only); `longmemeval-s` has ~50
+  sessions per question and `locomo` ~27 per conversation, so sleep costs grow fast. Check
+  with `--plan`.
+
+Known limits: the full-context budget defaults to 5,000 tokens because Groq's free tier caps
+a single request at its 8K tokens-per-minute limit, so on long histories it's a "recent
+history" baseline rather than an upper bound (`truncated_episodes` says how much it dropped).
+On LoCoMo, a two-person dialogue, the extractor still assumes a user/assistant chat.
+
 ## Tests
 
-Works from the repo root or `backend\`.
+Works from the repo root or `backend\`; from the root it also runs the eval harness tests.
 
 ```powershell
 pytest -q                                   # unit tests; integration tests skip

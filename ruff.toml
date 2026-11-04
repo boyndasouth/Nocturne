@@ -1,0 +1,8 @@
+# Ruff for code outside backend/ (the eval harness). Mirrors backend/pyproject.toml.
+line-length = 100
+target-version = "py311"
+src = ["backend", "."]  # app, scripts and eval are all first-party
+extend-exclude = ["backend"]  # backend/ uses its own pyproject config
+
+[lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]

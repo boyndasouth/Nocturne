@@ -39,6 +39,11 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check . && ruff format --check .
       - run: pytest -q
+      # Eval harness (repo root: ruff.toml + pytest.ini), incl. an offline end-to-end run.
+      - run: ruff check . && ruff format --check .
+        working-directory: .
+      - run: pytest -q eval/tests
+        working-directory: .
 
   # The dev machine is Windows: catch event-loop and path issues that Linux CI can't see.
   backend-windows:
@@ -55,3 +60,5 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - run: pip install -e ".[dev]"
       - run: pytest -q tests/unit
+      - run: pytest -q eval/tests  # end-to-end test skips without a database
+        working-directory: .
