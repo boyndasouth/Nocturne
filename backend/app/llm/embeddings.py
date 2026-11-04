@@ -26,16 +26,21 @@ class Embedder(Protocol):
     def embed_query(self, text: str) -> list[float]: ...
 
 
-class SentenceTransformerEmbedder:
-    """bge-small-en-v1.5 by default. Vectors are L2-normalised, so cosine distance is
-    meaningful in pgvector."""
+class FastEmbedEmbedder:
+    """bge-small-en-v1.5 via fastembed (ONNX Runtime, no torch). fastembed L2-normalises its
+    output, so cosine distance is meaningful in pgvector.
 
-    # BGE v1.5 recommends this instruction for retrieval queries (not for documents).
+    fastembed ships a quantized ONNX export of bge-small, so its vectors differ slightly from
+    sentence-transformers'. After switching, run `python -m scripts.reembed` once."""
+
+    # BGE v1.5 recommends this instruction for retrieval queries (not documents). fastembed's
+    # query_embed doesn't add it for BGE models, so we do.
     BGE_QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
-    def __init__(self, model_name: str, dim: int) -> None:
+    def __init__(self, model_name: str, dim: int, cache_dir: str | None = None) -> None:
         self.model_name = model_name
         self.dim = dim
+        self._cache_dir = cache_dir
         self._model: Any = None
         self._lock = threading.Lock()
 
@@ -46,10 +51,10 @@ class SentenceTransformerEmbedder:
         if self._model is None:
             with self._lock:
                 if self._model is None:
-                    from sentence_transformers import SentenceTransformer
+                    from fastembed import TextEmbedding
 
-                    model = SentenceTransformer(self.model_name, device="cpu")
-                    actual = model.get_sentence_embedding_dimension()
+                    model = TextEmbedding(self.model_name, cache_dir=self._cache_dir)
+                    actual = len(next(iter(model.embed(["dimension probe"]))))
                     if actual != self.dim:
                         raise ValueError(
                             f"{self.model_name} produces {actual}-d vectors, "
@@ -61,12 +66,11 @@ class SentenceTransformerEmbedder:
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         if not texts:
             return []
-        vecs = self._load().encode(list(texts), normalize_embeddings=True, batch_size=32)
-        return vecs.tolist()
+        return [v.tolist() for v in self._load().embed(list(texts), batch_size=32)]
 
     def embed_query(self, text: str) -> list[float]:
         prefix = self.BGE_QUERY_INSTRUCTION if "bge" in self.model_name.lower() else ""
-        return self._load().encode([prefix + text], normalize_embeddings=True)[0].tolist()
+        return next(iter(self._load().embed([prefix + text]))).tolist()
 
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -100,7 +104,9 @@ class HashEmbedder:
 def build_embedder(settings: Settings) -> Embedder:
     if settings.embedding_backend == "hash":
         return HashEmbedder(settings.embedding_dim)
-    return SentenceTransformerEmbedder(settings.embedding_model, settings.embedding_dim)
+    return FastEmbedEmbedder(
+        settings.embedding_model, settings.embedding_dim, settings.embedding_cache_dir
+    )
 
 
 async def aembed_query(embedder: Embedder, text: str) -> list[float]:

@@ -26,6 +26,9 @@ jobs:
         working-directory: backend
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nocturne_test
+      # Non-UTC DB sessions: psycopg returns timestamps in the session zone, and we once
+      # mislabelled those as UTC. Keep testing the non-default case.
+      PGTZ: America/Chicago
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

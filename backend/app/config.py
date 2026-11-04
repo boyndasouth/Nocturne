@@ -40,14 +40,18 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     sleep_model: str = "gemini-2.5-flash"
     sleep_rpm: int = 8
+    sleep_max_tokens: int = 8192  # JSON outputs for a whole batch, plus any thinking tokens
+    # Passed as `reasoning_effort` when set (Gemini's OpenAI endpoint accepts it).
+    sleep_reasoning_effort: Literal["none", "low", "medium", "high", ""] = ""
 
     llm_max_retries: int = 5
     llm_timeout_s: float = 60.0
 
     # --- Embeddings ---------------------------------------------------------------------------
     # "hash" is a deterministic, non-semantic embedder for tests/CI only.
-    embedding_backend: Literal["sentence-transformers", "hash"] = "sentence-transformers"
+    embedding_backend: Literal["fastembed", "hash"] = "fastembed"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
+    embedding_cache_dir: str | None = None  # default: fastembed's cache in the temp dir
     embedding_dim: int = 384  # must match vector(N) in migrations/001_init.sql
 
     # --- Tracing (Langfuse); disabled when keys are absent ------------------------------------
@@ -65,6 +69,30 @@ class Settings(BaseSettings):
     score_delta: float = 0.1
     recency_tau_days: float = 30.0
     reinforce_eta: float = 0.2
+
+    # --- Sleep cycle (spec §3.2) -------------------------------------------------------------
+    sleep_auto: bool = True  # in-process idle/backlog trigger
+    sleep_idle_minutes: float = 10.0  # (a) idle for N minutes ...
+    sleep_idle_min_episodes: int = 3  # ... with at least this many pending episodes
+    sleep_backlog_episodes: int = 30  # (b) M pending episodes triggers regardless of idle
+    sleep_poll_seconds: float = 60.0
+    sleep_retry_backoff_minutes: float = 10.0  # after a failed cycle; doubles each time
+    sleep_max_episodes: int = 200  # per cycle; the rest wait for the next one
+    sleep_max_attempts: int = 3  # resume a failed cycle at most this many times
+    sleep_stale_minutes: float = 30.0  # a "running" cycle with no heartbeat is presumed dead
+    sleep_recursion_limit: int = 500  # LangGraph steps; each batch is one step
+
+    extract_batch_chars: int = 12_000
+    extract_batch_episodes: int = 25
+    judge_batch_groups: int = 12  # dedup / contradiction groups per LLM call
+    neighbors_k: int = 4
+    # Cosine-similarity thresholds (tune on a dev split; see tests/unit/test_dedup.py).
+    dedup_auto_sim: float = 0.97  # ≥ this: merge without asking the LLM
+    dedup_judge_sim: float = 0.82  # ≥ this: ask the LLM whether it's a duplicate
+    conflict_sim: float = 0.65  # ≥ this: ask the LLM whether the facts conflict
+    # Ablation switches (spec §9).
+    enable_dedup: bool = True
+    enable_contradiction: bool = True
 
     @property
     def score_weights(self) -> ScoreWeights:

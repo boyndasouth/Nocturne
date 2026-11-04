@@ -34,7 +34,19 @@ def migrate(database_url: str, *, verbose: bool = True) -> list[str]:
                 print(f"applied {path.name}")
     if verbose and not applied_now:
         print("schema is up to date")
+    setup_checkpointer(database_url)
     return applied_now
+
+
+def setup_checkpointer(database_url: str) -> None:
+    """Create/upgrade LangGraph's checkpoint tables (sleep-cycle resume). Idempotent."""
+    from langgraph.checkpoint.postgres import PostgresSaver
+    from psycopg.rows import dict_row
+
+    with psycopg.connect(
+        database_url, autocommit=True, prepare_threshold=None, row_factory=dict_row
+    ) as conn:
+        PostgresSaver(conn).setup()  # type: ignore[arg-type]
 
 
 def main() -> int:

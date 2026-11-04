@@ -4,7 +4,7 @@ It never rewrites long-term memory; only the sleep agent does that."""
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
@@ -13,7 +13,7 @@ from app.agents.episode_writer import EpisodeWriter
 from app.llm.client import ChatMessage, LLMClient, LLMError
 from app.llm.prompts import RESPONDER_SYSTEM, RESPONDER_USER
 from app.llm.tracing import Tracer
-from app.memory.models import MemoryNote, ScoredNote
+from app.memory.models import MemoryNote, ScoredNote, Tier
 from app.memory.retriever import HierarchicalRetriever
 from app.memory.store import MemoryStore
 
@@ -35,18 +35,33 @@ class ChatResult:
     episode_id: UUID
 
 
-def _fmt_note(ref: int, note: MemoryNote) -> str:
+def _preview(note: MemoryNote) -> str:
     text = note.content
     if len(text) > _PREVIEW_CHARS:
         text = text[:_PREVIEW_CHARS].rstrip() + " …"
-    return f"[M{ref}] ({note.valid_from:%Y-%m-%d %H:%M} UTC) {text}"
+    return text
+
+
+def _fmt_note(ref: int, note: MemoryNote) -> str:
+    if note.tier is Tier.FACT:
+        return f"[M{ref}] FACT (true since {note.valid_from:%Y-%m-%d}) {_preview(note)}"
+    return f"[M{ref}] ({note.valid_from:%Y-%m-%d %H:%M} UTC) {_preview(note)}"
+
+
+def _fmt_previous(ref: int, note: MemoryNote) -> str:
+    until = f"{note.valid_to:%Y-%m-%d}" if note.valid_to else "?"
+    return f"    [M{ref}] previously ({note.valid_from:%Y-%m-%d} to {until}) {_preview(note)}"
 
 
 def build_memory_context(
-    retrieved: Sequence[ScoredNote], recent: Sequence[MemoryNote]
+    retrieved: Sequence[ScoredNote],
+    recent: Sequence[MemoryNote],
+    history: Mapping[UUID, Sequence[MemoryNote]] | None = None,
 ) -> tuple[str, dict[int, UUID]]:
     """Number memories with short refs (LLMs mangle UUIDs) and return the ref → id map.
-    Retrieved notes come first, by relevance, then recent turns not already shown."""
+    Retrieved notes come first, by relevance, each fact followed by the older facts it
+    superseded; then recent turns not already shown."""
+    history = history or {}
     refmap: dict[int, UUID] = {}
     seen: set[UUID] = set()
     relevant_lines: list[str] = []
@@ -59,6 +74,13 @@ def build_memory_context(
         refmap[ref] = s.note.id
         seen.add(s.note.id)
         relevant_lines.append(_fmt_note(ref, s.note))
+        for old in history.get(s.note.id, ()):
+            if old.id in seen:
+                continue
+            ref = len(refmap) + 1
+            refmap[ref] = old.id
+            seen.add(old.id)
+            relevant_lines.append(_fmt_previous(ref, old))
     for n in recent:
         if n.id in seen:
             continue
@@ -116,7 +138,10 @@ class Responder:
         with self._tracer.observe("chat", as_type="agent", input={"message": message}) as obs:
             retrieved = await self._retriever.retrieve(message, now=now, as_of=occurred_at)
             recent = await self._store.recent_episodes(self._recent_turns, before=occurred_at)
-            memories, refmap = build_memory_context(retrieved, recent)
+            history = await self._store.superseded_history(
+                [s.note.id for s in retrieved if s.note.tier is Tier.FACT]
+            )
+            memories, refmap = build_memory_context(retrieved, recent, history)
 
             messages: list[ChatMessage] = [
                 {"role": "system", "content": RESPONDER_SYSTEM},

@@ -9,10 +9,13 @@ from psycopg_pool import AsyncConnectionPool
 
 from app.agents.episode_writer import EpisodeWriter
 from app.agents.responder import Responder
+from app.agents.sleep.runner import SleepRunner
+from app.agents.sleep.trigger import ActivityClock
 from app.config import Settings
 from app.llm.client import LLMClient
 from app.llm.embeddings import Embedder
 from app.llm.tracing import Tracer
+from app.memory.cycles import CycleStore
 from app.memory.retriever import HierarchicalRetriever
 from app.memory.store import MemoryStore
 
@@ -28,6 +31,9 @@ class Container:
     retriever: HierarchicalRetriever
     writer: EpisodeWriter
     responder: Responder
+    cycles: CycleStore
+    sleep_runner: SleepRunner
+    activity: ActivityClock
 
 
 def get_container(request: Request) -> Container:

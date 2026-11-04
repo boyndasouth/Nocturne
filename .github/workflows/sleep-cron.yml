@@ -1,0 +1,48 @@
+name: Sleep cron
+
+# Spec §3.2 trigger (c): runs a sleep cycle even when the free host has spun down and the
+# in-process idle trigger isn't running. Waking the host is part of the job.
+#
+# Setup (repo Settings > Secrets and variables > Actions):
+#   secret   NOCTURNE_API_KEY   the backend's API_KEY
+#   variable NOCTURNE_URL       e.g. https://nocturne.onrender.com (no trailing slash)
+# Until NOCTURNE_URL is set (Phase 4 deploy), the job skips itself.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"  # every 6 hours, off the top of the hour
+  workflow_dispatch:
+
+concurrency:
+  group: sleep-cron
+  cancel-in-progress: false
+
+jobs:
+  sleep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      URL: ${{ vars.NOCTURNE_URL }}
+      API_KEY: ${{ secrets.NOCTURNE_API_KEY }}
+    steps:
+      - name: Skip until deployed
+        if: env.URL == ''
+        run: echo "NOCTURNE_URL is not set; skipping."
+
+      - name: Wake the host
+        if: env.URL != ''
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS --max-time 30 "$URL/health"; then exit 0; fi
+            echo "not up yet ($i)"; sleep 15
+          done
+          exit 1
+
+      - name: Trigger a sleep cycle
+        if: env.URL != ''
+        # 202 = started in the background, 200 = nothing to do, 409 = one is already running.
+        run: |
+          code=$(curl -sS -o body.json -w '%{http_code}' --max-time 60 -X POST \
+            -H "X-API-Key: $API_KEY" "$URL/sleep")
+          cat body.json; echo
+          case "$code" in 200|202|409) exit 0 ;; *) echo "HTTP $code"; exit 1 ;; esac

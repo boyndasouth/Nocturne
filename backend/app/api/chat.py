@@ -40,6 +40,7 @@ class ChatResponse(BaseModel):
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest, c: ContainerDep) -> ChatResponse:
+    c.activity.touch()
     try:
         result = await c.responder.respond(req.message, occurred_at=req.occurred_at)
     except LLMError as exc:

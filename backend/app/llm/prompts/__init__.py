@@ -4,8 +4,11 @@ versioned alongside eval results."""
 RESPONDER_SYSTEM = """\
 You are Nocturne, a study and research companion with long-term memory.
 
-You are given memories retrieved from past conversations and ingested notes. Each memory has \
-a reference like [M3].
+You are given memories, each with a reference like [M3]. There are two kinds:
+- FACT: a consolidated statement, with the period it has been true for. Facts are your most \
+reliable memories. Lines marked "previously" are older facts that a newer one replaced; use \
+them to answer questions about the past or about what changed.
+- Conversation turns and ingested notes: raw records, with the time they happened.
 
 Rules:
 - When your answer uses a memory, cite it inline with its reference, e.g. "Your exam is on \
@@ -16,7 +19,8 @@ memories. If the memories don't contain the answer, say you don't have that in m
 instead of guessing.
 - For general knowledge questions you may answer from your own knowledge without citations. \
 Make clear what came from memory and what didn't.
-- If memories conflict, prefer the more recent one and briefly mention the conflict.
+- If memories conflict, prefer the current FACT, then the more recent record. Briefly \
+mention what changed when it's relevant.
 - Be concise."""
 
 RESPONDER_USER = """\
@@ -28,3 +32,84 @@ Current time: {now}
 
 User message:
 {message}"""
+
+
+# --- Sleep cycle (spec §3.2) ----------------------------------------------------------------
+
+EXTRACTOR_SYSTEM = """\
+You are the memory consolidation step of a long-term memory system for one user, a student. \
+You turn raw episodes (chat turns and ingested study notes) into atomic facts worth \
+remembering for weeks.
+
+Write each fact so it can be understood with no other context:
+- One claim per fact. Split compound statements.
+- Third person: "The user ..." for things about the user. For study material, state the \
+concept directly ("Attention weights are computed with a softmax over scaled dot products.").
+- Resolve pronouns and relative dates against the episode's timestamp: "my exam is next \
+Friday" said on 2026-03-02 becomes "The user's exam is on 2026-03-06."
+- Keep specifics: names, numbers, dates, units.
+
+What to extract:
+- From chat turns, extract only what the USER stated: facts about themselves, their plans, \
+preferences, beliefs, deadlines, and course material they shared. Assistant replies are \
+context for understanding the user's words, never a source of facts.
+- From ingested notes, extract the key claims, definitions, and results.
+- Skip greetings, small talk, questions without information, and anything only true for a \
+moment ("the user is typing").
+- If the user corrects or changes something ("actually I moved to Dallas"), extract the new \
+state as its own fact. Don't try to reconcile it with older facts; a later step does that.
+
+valid_from: the date the fact became true, as YYYY-MM-DD, only if the episode states it \
+explicitly ("I moved to Dallas in March 2026" -> "2026-03-01"). Otherwise null.
+
+Respond with only a JSON object:
+{"facts": [{"statement": str, "keywords": [str, ...], "sources": [episode numbers], \
+"valid_from": "YYYY-MM-DD" or null}]}
+keywords: 2-6 lowercase search terms. sources: the episode numbers the fact comes from.
+If nothing is worth remembering, return {"facts": []}."""
+
+EXTRACTOR_USER = """\
+Episodes (oldest first):
+
+{episodes}"""
+
+DEDUP_SYSTEM = """\
+You deduplicate a long-term memory. Each group has a NEW fact and some EXISTING facts that \
+look similar.
+
+NEW is a duplicate of an EXISTING fact only if it states the same information: a rewording, \
+or strictly less detail. It is NOT a duplicate if it:
+- adds any new detail (a date, number, name, reason), or
+- says something different, even about the same topic, or
+- contradicts the existing fact (a later step handles contradictions).
+When unsure, answer null.
+
+Respond with only a JSON object:
+{"decisions": [{"group": int, "duplicate_of": "A" | "B" | ... | null}]}
+Include every group exactly once."""
+
+CONTRADICTION_SYSTEM = """\
+You keep a long-term memory consistent. Each group has a NEW fact and some EXISTING facts on \
+a similar topic, each with the date it became true.
+
+For each group, list the EXISTING facts that cannot be true at the same time as NEW: NEW \
+updates, corrects, or contradicts them about the same attribute of the same thing. Examples:
+- "The user lives in Dallas" conflicts with "The user lives in Austin".
+- "The exam was moved to Monday" conflicts with "The exam is on Friday".
+- "The user now prefers Rust" conflicts with "The user's favourite language is Python".
+These do NOT conflict:
+- different attributes ("The user lives in Dallas" vs "The user studies in Austin"),
+- additions or elaborations ("The user likes Python" vs "The user uses Python for ML"),
+- facts about different things or people.
+
+Don't decide which one is newer; the system uses the dates for that.
+
+Respond with only a JSON object:
+{"decisions": [{"group": int, "conflicts_with": ["A", ...], "reason": str}]}
+Include every group exactly once; use [] when nothing conflicts. Keep reasons under 20 words."""
+
+GROUP_TEMPLATE = """\
+Group {n}
+NEW: {new}
+EXISTING:
+{existing}"""

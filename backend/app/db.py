@@ -55,6 +55,18 @@ async def verify_schema(database_url: str, expected_dim: int) -> None:
         ).fetchone()
         if row is None:
             raise SchemaError("memory_notes table not found. Run `python -m scripts.migrate`.")
+        phase2 = await (
+            await conn.execute(
+                "select to_regclass('checkpoints') is not null as ok,"
+                " exists (select 1 from pg_attribute where attrelid ="
+                " to_regclass('memory_notes') and attname = 'consolidated_in') as ok2"
+            )
+        ).fetchone()
+        if phase2 is None or not (phase2["ok"] and phase2["ok2"]):
+            raise SchemaError(
+                "The database is missing the Phase 2 sleep-cycle schema. "
+                "Run `python -m scripts.migrate`."
+            )
         if row["dim"] != expected_dim:
             raise SchemaError(
                 f"memory_notes.embedding is vector({row['dim']}) but EMBEDDING_DIM={expected_dim}."

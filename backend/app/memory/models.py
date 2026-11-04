@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Tier(StrEnum):
@@ -47,6 +47,14 @@ class MemoryNote(BaseModel):
     status: Status
     source_episode_ids: list[UUID] = Field(default_factory=list)
     version: int
+    decay_tau_days: float = 30.0
+
+    @field_validator("last_accessed", "valid_from", "valid_to", "recorded_at")
+    @classmethod
+    def _utc(cls, v: datetime | None) -> datetime | None:
+        """psycopg returns timestamptz in the *session* time zone. Prompts label times as
+        UTC and show dates, so normalise here, whatever the server or pooler is set to."""
+        return v.astimezone(UTC) if v is not None and v.tzinfo is not None else v
 
 
 class NewNote(BaseModel):
@@ -60,6 +68,8 @@ class NewNote(BaseModel):
     valid_from: datetime | None = None
     recorded_at: datetime | None = None
     source_episode_ids: list[UUID] = Field(default_factory=list)
+    valid_to: datetime | None = None
+    status: Status = Status.ACTIVE
 
 
 class Candidate(BaseModel):
@@ -76,3 +86,19 @@ class ScoredNote(BaseModel):
     semantic_sim: float
     keyword_score: float
     recency: float
+
+
+class Neighbor(BaseModel):
+    """An existing note found by vector search, with its cosine similarity to a probe."""
+
+    note: MemoryNote
+    sim: float
+
+
+class VersionRecord(BaseModel):
+    note_id: UUID
+    version: int
+    snapshot: dict
+    changed_by_cycle: UUID | None
+    reason: str | None
+    created_at: datetime

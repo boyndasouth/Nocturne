@@ -3,8 +3,9 @@
 A long-term memory agent. A fast online agent answers questions; an offline "sleep" agent
 consolidates, links, corrects, and prunes memories between sessions.
 
-**Status: Phase 1 (foundations).** Chat with episode memory, hybrid retrieval, and tracing.
-The sleep cycle arrives in Phase 2.
+**Status: Phase 2 (sleep cycle v1).** Chat with episode memory and hybrid retrieval, plus
+a checkpointed LangGraph sleep cycle that extracts facts, merges duplicates, and supersedes
+contradicted facts with bitemporal history. Linking, themes, and forgetting arrive in Phase 3.
 
 ## What works now
 
@@ -15,6 +16,10 @@ The sleep cycle arrives in Phase 2.
 | bge-small embeddings + hybrid search (pgvector cosine ∪ Postgres full-text) | `backend/app/llm/embeddings.py`, `backend/app/memory/store.py` |
 | §5 scoring: `α·sim + β·keyword + γ·strength + δ·recency` | `backend/app/memory/scoring.py` |
 | `POST /chat`, `POST /ingest`, `GET /health` | `backend/app/api/` |
+| Sleep graph: Extractor → Deduplicator → Contradiction Resolver → Apply (LangGraph, Postgres checkpoints) | `backend/app/agents/sleep/` |
+| Versioned edits: full-row JSON snapshot before every change; `supersedes` links; valid time vs. transaction time | `backend/app/memory/store.py`, `migrations/002_sleep_cycle.sql` |
+| `POST /sleep`, `GET /sleep/cycles[/{id}]`, idle/backlog trigger, GitHub Actions cron | `backend/app/api/sleep.py`, `backend/app/agents/sleep/trigger.py`, `.github/workflows/sleep-cron.yml` |
+| Responder sees current facts, plus the older facts they replaced, with dates | `backend/app/agents/responder.py` |
 
 ## Setup (Windows, PowerShell)
 
@@ -25,9 +30,9 @@ The sleep cycle arrives in Phase 2.
 cd nocturne\backend
 python -m venv $HOME\.venvs\nocturne
 & $HOME\.venvs\nocturne\Scripts\Activate.ps1
-pip install -e ".[dev,embeddings]"     # all prebuilt wheels; no compiler needed
-copy .env.example .env                 # then fill in DATABASE_URL and GROQ_API_KEY
-python -m scripts.migrate              # creates the pgvector extension and tables
+pip install -e ".[dev,embeddings]"     # all prebuilt wheels (ONNX Runtime, no torch)
+copy .env.example .env                 # fill in DATABASE_URL, GROQ_API_KEY, GEMINI_API_KEY
+python -m scripts.migrate              # pgvector, tables, and LangGraph checkpoint tables
 uvicorn app.main:create_app --factory --reload --loop app.eventloop:loop_factory
 ```
 
@@ -38,7 +43,11 @@ Without the flag the server stops at startup and prints this command.
 don't need to touch the dashboard. On Supabase, use the **Session pooler** connection string.
 Prefer local? `docker compose up -d` gives you the same setup in Docker.
 
-The first start downloads bge-small (~130 MB) into the Hugging Face cache.
+The first start downloads bge-small (~70 MB, quantized ONNX) into fastembed's cache.
+
+**Upgrading from Phase 1:** run `python -m scripts.migrate`, then `python -m scripts.reembed`
+once. Embeddings moved from sentence-transformers to fastembed, whose bge-small vectors differ
+slightly. Your existing episodes are consolidated by the first sleep cycle.
 
 ## Try it
 
@@ -52,6 +61,25 @@ irm localhost:8000/chat -Method Post -Headers $h -Body '{"message":"When is my e
 The second answer cites the first turn (`citations[].note_id`), even after a restart. With
 Langfuse keys set, each request shows up as a `chat` trace containing `retrieve` and
 `responder` spans. Interactive docs: http://localhost:8000/docs
+
+### Sleep (Phase 2 exit check)
+
+```powershell
+irm localhost:8000/chat -Method Post -Headers $h -Body '{"message":"I live in Austin"}'
+irm "localhost:8000/sleep?wait=true" -Method Post -Headers $h
+irm localhost:8000/chat -Method Post -Headers $h -Body '{"message":"Actually I moved to Dallas last week"}'
+irm "localhost:8000/sleep?wait=true" -Method Post -Headers $h
+irm localhost:8000/chat -Method Post -Headers $h -Body '{"message":"Where do I live, and where did I live before?"}'
+irm localhost:8000/sleep/cycles -Headers $h      # what each cycle did, tokens spent
+```
+
+Without `?wait=true`, `/sleep` returns 202 and runs in the background. You rarely need to call
+it: the server sleeps on its own after `SLEEP_IDLE_MINUTES` idle (with at least
+`SLEEP_IDLE_MIN_EPISODES` pending) or once `SLEEP_BACKLOG_EPISODES` pile up. After deploy, the
+`Sleep cron` workflow covers the hours when the free host is asleep (setup notes in the file).
+
+For benchmark replay, pass `{"occurred_at": "..."}` to `/sleep` as well as `/chat`: facts are
+recorded at that time, so replayed questions can't see facts from the future.
 
 ## Tests
 
@@ -76,3 +104,27 @@ CI (`.github/workflows/ci.yml`) runs everything against a pgvector service conta
 - **OR-semantics full-text.** `plainto_tsquery` ANDs every word, which makes natural-language
   questions match almost nothing. The query ORs the lexemes instead.
 - **Pooler-safe.** Prepared statements are off, so transaction-mode poolers work.
+
+### Sleep cycle
+
+- **The LLM decides *whether* facts conflict; valid time decides *which wins*.** The fact
+  that became true later supersedes the other, so notes ingested today about January become
+  history instead of overriding March. Ordering by time also makes supersession cycles
+  impossible.
+- **Narrow auto-merge band.** Only cosine ≥ 0.97 merges without asking. "Lives in Austin" vs.
+  "lives in Dallas" can score ~0.9 with bge-small, so anything looser would silently merge
+  contradictions. 0.82–0.97 goes to an LLM judge that is told to answer "not a duplicate"
+  when unsure. Thresholds are settings; tune them on a dev split in Phase 4.
+- **One batch per checkpointed step.** A free-tier rate limit on batch 7 of 9 resumes at batch
+  7; batches 1–6 aren't paid for again. Failed cycles are resumed (up to
+  `SLEEP_MAX_ATTEMPTS`) before new work is picked up.
+- **All-or-nothing writes.** Every step before Apply only reads memory. Apply writes facts,
+  merges, supersessions, version snapshots, the episodes' `consolidated_in`, and the cycle's
+  `succeeded` status in one transaction, so a resumed cycle can't double-apply.
+- **One cycle at a time, across processes.** A partial unique index allows a single `running`
+  row in `sleep_cycles`; a cycle whose heartbeat stops (crashed process) is taken over after
+  `SLEEP_STALE_MINUTES`.
+- **Facts come from the user, not the assistant.** The extractor uses assistant replies only
+  as context, so a hallucinated answer can't become a "memory".
+- **Checkpoints are deleted after success** to keep free-tier storage flat. Each cycle's
+  episode ids, token count, and LLM calls stay in `sleep_cycles`.

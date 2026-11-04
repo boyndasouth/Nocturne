@@ -1,6 +1,6 @@
 """Retriever (spec §5).
 
-Phase 1: hybrid search over the episode tier only.
+Phase 2: hybrid search over active facts and episodes, scored together.
 Phase 3 adds themes → facts → one-hop graph expansion → episode fallback, plus temporal
 filtering on valid_from/valid_to.
 """
@@ -43,6 +43,7 @@ class HierarchicalRetriever:
         top_k: int | None = None,
         now: datetime | None = None,
         as_of: datetime | None = None,
+        tiers: tuple[Tier, ...] = (Tier.FACT, Tier.EPISODE),
     ) -> list[ScoredNote]:
         """`now` drives recency scoring. `as_of`, used only for simulated time in benchmark
         replay, hides notes recorded later. Live mode leaves it None so app/DB clock skew
@@ -54,7 +55,7 @@ class HierarchicalRetriever:
             candidates = await self._store.hybrid_candidates(
                 qvec,
                 query,
-                tiers=[Tier.EPISODE],
+                tiers=list(tiers),
                 statuses=[Status.ACTIVE],
                 pool_size=max(self._pool, k),
                 as_of=as_of,

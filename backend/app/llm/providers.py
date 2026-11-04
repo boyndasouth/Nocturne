@@ -40,6 +40,9 @@ def build_sleep_client(settings: Settings, tracer: Tracer) -> OpenAICompatClient
         env_name = "OPENROUTER_API_KEY"
     if key is None:
         raise ConfigError(f"{env_name} is not set (needed for sleep cycles).")
+    extra: dict[str, object] = {}
+    if settings.sleep_reasoning_effort:
+        extra["reasoning_effort"] = settings.sleep_reasoning_effort
     return OpenAICompatClient(
         name=settings.sleep_provider,
         base_url=base_url,
@@ -49,4 +52,5 @@ def build_sleep_client(settings: Settings, tracer: Tracer) -> OpenAICompatClient
         tracer=tracer,
         max_retries=settings.llm_max_retries,
         timeout_s=max(settings.llm_timeout_s, 120.0),  # batch prompts are long
+        extra_params=extra,
     )

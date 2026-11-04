@@ -24,5 +24,6 @@ class IngestResponse(BaseModel):
 
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest(req: IngestRequest, c: ContainerDep) -> IngestResponse:
+    c.activity.touch()
     notes = await c.writer.write_document(req.text, source=req.source, occurred_at=req.occurred_at)
     return IngestResponse(episode_ids=[n.id for n in notes])

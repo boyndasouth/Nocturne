@@ -47,7 +47,8 @@ def fresh_db(db_url: str) -> str:
 
 
 class FakeLLM:
-    """Scripted LLM. `reply` receives the prompt messages and returns the answer text."""
+    """Scripted LLM. `reply` receives the prompt messages and returns the answer text.
+    `fail_on` makes calls with those trace names raise (consumed once per entry)."""
 
     name = "fake"
     model = "fake-model"
@@ -55,14 +56,22 @@ class FakeLLM:
     def __init__(self, reply: Callable[[Sequence[ChatMessage]], str] | None = None) -> None:
         self.reply = reply or (lambda _messages: "Noted.")
         self.calls: list[list[ChatMessage]] = []
+        self.trace_names: list[str] = []
         self.fail = False
+        self.fail_on: list[str] = []
 
-    async def chat(self, messages: Sequence[ChatMessage], **_: object) -> LLMResponse:
+    async def chat(
+        self, messages: Sequence[ChatMessage], *, trace_name: str = "llm.chat", **_: object
+    ) -> LLMResponse:
         self.calls.append(list(messages))
+        self.trace_names.append(trace_name)
         if self.fail:
             raise LLMError("provider down")
+        if trace_name in self.fail_on:
+            self.fail_on.remove(trace_name)
+            raise LLMError(f"{trace_name}: rate limited")
         return LLMResponse(
-            text=self.reply(messages), model=self.model, input_tokens=0, output_tokens=0,
+            text=self.reply(messages), model=self.model, input_tokens=10, output_tokens=5,
             latency_ms=1.0,
         )  # fmt: skip
 
@@ -73,7 +82,7 @@ class FakeLLM:
 def ref_for(messages: Sequence[ChatMessage], needle: str) -> str | None:
     """Find the [M#] ref of the memory line containing `needle` in the prompt."""
     for line in messages[-1]["content"].splitlines():
-        m = re.match(r"\[(M\d+)\]", line)
+        m = re.match(r"\s*\[(M\d+)\]", line)
         if m and needle in line:
             return m.group(1)
     return None
@@ -88,11 +97,20 @@ def make_test_client(app: FastAPI) -> TestClient:
 def make_client(fresh_db: str) -> Iterator[Callable[..., TestClient]]:
     clients: list[TestClient] = []
 
-    def _make(llm: FakeLLM | None = None, **overrides: object) -> TestClient:
+    def _make(
+        llm: FakeLLM | None = None, sleep_llm: FakeLLM | None = None, **overrides: object
+    ) -> TestClient:
+        overrides.setdefault("sleep_auto", False)
         settings = Settings(
             database_url=fresh_db, embedding_backend="hash", _env_file=None, **overrides
         )
-        app = create_app(settings, llm=llm or FakeLLM(), embedder=HashEmbedder(), tracer=Tracer())
+        app = create_app(
+            settings,
+            llm=llm or FakeLLM(),
+            sleep_llm=sleep_llm,
+            embedder=HashEmbedder(),
+            tracer=Tracer(),
+        )
         client = make_test_client(app)
         client.__enter__()  # run lifespan
         clients.append(client)
