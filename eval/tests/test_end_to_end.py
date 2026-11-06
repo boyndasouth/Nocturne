@@ -19,6 +19,17 @@ TEST_DB_URL = os.environ.get("TEST_DATABASE_URL")
 def eval_env(tmp_path, monkeypatch):
     if not TEST_DB_URL:
         pytest.skip("TEST_DATABASE_URL not set")
+    # Run on defaults: ignore backend/.env and any EVAL_* or backend setting exported in the
+    # shell (e.g. EVAL_SLEEP_EVERY_SESSIONS=10 left over from a real run).
+    from app.config import Settings
+    from eval.config import EvalSettings
+
+    fields = {f.upper() for f in Settings.model_fields}
+    for key in list(os.environ):
+        if key.upper().startswith("EVAL_") or key.upper() in fields:
+            monkeypatch.delenv(key)
+    monkeypatch.setitem(EvalSettings.model_config, "env_file", None)
+    monkeypatch.setattr("eval.runner.BACKEND_ENV", tmp_path / "no.env")
     monkeypatch.setenv("EVAL_DATABASE_URL", TEST_DB_URL)
     monkeypatch.setenv("EVAL_RESULTS_DIR", str(tmp_path / "results"))
     monkeypatch.setenv("EVAL_CACHE_PATH", str(tmp_path / "cache.sqlite"))
