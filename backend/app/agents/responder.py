@@ -44,8 +44,14 @@ def _preview(note: MemoryNote) -> str:
 
 
 def _fmt_note(ref: int, note: MemoryNote) -> str:
+    if note.tier is Tier.THEME:
+        return f"[M{ref}] THEME (since {note.valid_from:%Y-%m-%d}) {_preview(note)}"
     if note.tier is Tier.FACT:
-        return f"[M{ref}] FACT (true since {note.valid_from:%Y-%m-%d}) {_preview(note)}"
+        if note.valid_to is not None:  # a superseded fact, retrieved for a time question
+            period = f"true {note.valid_from:%Y-%m-%d} to {note.valid_to:%Y-%m-%d}"
+        else:
+            period = f"true since {note.valid_from:%Y-%m-%d}"
+        return f"[M{ref}] FACT ({period}) {_preview(note)}"
     return f"[M{ref}] ({note.valid_from:%Y-%m-%d %H:%M} UTC) {_preview(note)}"
 
 
@@ -145,7 +151,11 @@ class Responder:
             retrieved = await self._retriever.retrieve(message, now=now, as_of=occurred_at)
             recent = await self._store.recent_episodes(self._recent_turns, before=occurred_at)
             history = await self._store.superseded_history(
-                [s.note.id for s in retrieved if s.note.tier is Tier.FACT]
+                [
+                    s.note.id
+                    for s in retrieved
+                    if s.note.tier is Tier.FACT and s.note.valid_to is None
+                ]
             )
             memories, refmap = build_memory_context(retrieved, recent, history)
 

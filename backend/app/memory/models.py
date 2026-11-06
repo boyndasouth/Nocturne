@@ -87,6 +87,9 @@ class ScoredNote(BaseModel):
     semantic_sim: float
     keyword_score: float
     recency: float
+    # How retrieval reached it: "search", "theme" (member of a top theme), "link" (one hop
+    # from a top fact), or "fallback" (archived episode search).
+    via: str = "search"
 
 
 class Neighbor(BaseModel):

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.memory.scoring import ScoreWeights
+
+if TYPE_CHECKING:
+    from app.memory.retriever import RetrievalConfig
 
 
 class Settings(BaseSettings):
@@ -63,6 +66,14 @@ class Settings(BaseSettings):
     # --- Retrieval & scoring (spec §5) --------------------------------------------------------
     retrieval_top_k: int = 8
     retrieval_candidate_pool: int = 40
+    # Hierarchical retrieval (spec §5): themes first, then member facts and one link hop.
+    retrieval_theme_k: int = 2
+    retrieval_theme_decay: float = 0.85  # a theme's member facts inherit its score x this
+    retrieval_link_decay: float = 0.7  # a linked fact inherits the linking fact's score x this
+    retrieval_expand_from: int = 8  # top facts whose links are followed
+    retrieval_temporal: bool = True  # parse "in March", "last week", ... into a time window
+    retrieval_temporal_weight: float = 0.15
+    retrieval_fallback_min_score: float = 0.45  # weaker best match -> search archived turns
     recent_turns: int = 4
     score_alpha: float = 0.6
     score_beta: float = 0.2
@@ -106,6 +117,22 @@ class Settings(BaseSettings):
     theme_batch_clusters: int = 6  # clusters per LLM call
     theme_facts_shown: int = 25  # members the LLM sees per cluster
     theme_max_facts: int = 2000  # newest active facts considered for clustering
+
+    @property
+    def retrieval_config(self) -> RetrievalConfig:
+        from app.memory.retriever import RetrievalConfig
+
+        return RetrievalConfig(
+            top_k=self.retrieval_top_k,
+            candidate_pool=self.retrieval_candidate_pool,
+            theme_k=self.retrieval_theme_k,
+            theme_decay=self.retrieval_theme_decay,
+            link_decay=self.retrieval_link_decay,
+            expand_from=self.retrieval_expand_from,
+            temporal=self.retrieval_temporal,
+            temporal_weight=self.retrieval_temporal_weight,
+            fallback_min_score=self.retrieval_fallback_min_score,
+        )
 
     @property
     def score_weights(self) -> ScoreWeights:

@@ -78,6 +78,7 @@ def create_app(
             recency_tau_days=settings.recency_tau_days,
             top_k=settings.retrieval_top_k,
             candidate_pool=settings.retrieval_candidate_pool,
+            config=settings.retrieval_config,
             tracer=tracer_,
         )
         writer = EpisodeWriter(store, embedder_)

@@ -38,6 +38,7 @@ QUESTION_FIELDS = (
     "judge_raw",
     "retrieval_ms",
     "retrieved",
+    "retrieved_via",
     "context_chars",
     "answer_tokens",
     "judge_tokens",

@@ -3,11 +3,12 @@
 A long-term memory agent. A fast online agent answers questions; an offline "sleep" agent
 consolidates, links, corrects, and prunes memories between sessions.
 
-**Status: Phase 3, step 2 of 4 (Linker + Abstractor).** Chat with episode memory and hybrid
-retrieval, a checkpointed LangGraph sleep cycle that extracts facts, merges duplicates,
-supersedes contradicted facts with bitemporal history, links related facts and summarises
-clusters of facts into themes, and a benchmark harness that compares it against baselines.
-Next in Phase 3: the hierarchical retriever that uses links and themes, then forgetting.
+**Status: Phase 3, step 3 of 4 (hierarchical retriever).** A checkpointed LangGraph sleep
+cycle extracts facts, merges duplicates, supersedes contradicted facts with bitemporal
+history, links related facts and summarises clusters of facts into themes. Retrieval walks
+that structure: themes, their facts, one hop of links, and what was true at the time a
+question asks about. A benchmark harness compares it against baselines. Next: forgetting
+and the Auditor.
 
 ## What works now
 
@@ -17,6 +18,8 @@ Next in Phase 3: the hierarchical retriever that uses links and themes, then for
 | Groq / Gemini / OpenRouter client: rate limiting, Retry-After-aware backoff, Langfuse generations | `backend/app/llm/client.py` |
 | bge-small embeddings + hybrid search (pgvector cosine ∪ Postgres full-text) | `backend/app/llm/embeddings.py`, `backend/app/memory/store.py` |
 | §5 scoring: `α·sim + β·keyword + γ·strength + δ·recency` | `backend/app/memory/scoring.py` |
+| Hierarchical retrieval: themes → member facts → one link hop, archived-episode fallback, score inheritance | `backend/app/memory/retriever.py` |
+| Time phrases ("in March", "last week", "2 months ago", "before May") → a window that brings back superseded facts true then | `backend/app/memory/temporal.py` |
 | `POST /chat`, `POST /ingest`, `GET /health` | `backend/app/api/` |
 | Sleep graph: Extractor → Deduplicator → Contradiction Resolver → Linker → Abstractor → Apply (LangGraph, Postgres checkpoints) | `backend/app/agents/sleep/` |
 | Linker: typed fact-to-fact links (`related`, `elaborates`, `example_of`, `caused_by`), batched LLM labelling | `backend/app/agents/sleep/linker.py` |
@@ -161,6 +164,25 @@ CI (`.github/workflows/ci.yml`) runs everything against a pgvector service conta
 - **OR-semantics full-text.** `plainto_tsquery` ANDs every word, which makes natural-language
   questions match almost nothing. The query ORs the lexemes instead.
 - **Pooler-safe.** Prepared statements are off, so transaction-mode poolers work.
+
+### Retrieval
+
+- **One search per tier.** Themes, facts and episodes each get their own candidate pool, so
+  hundreds of raw turns can't push the few themes and facts out.
+- **Expansion inherits relevance.** A fact summarised by a top theme gets the theme's score
+  × 0.85; a fact one link away from a top fact gets × 0.7. Its final score is the higher of
+  that and its own, so expansion can surface a fact that shares no words with the question
+  (multi-hop) without pushing down a direct match. Results carry `via` (`search`, `theme`,
+  `link`, `fallback`), which the eval logs as `retrieved_via`.
+- **Time phrases are a soft signal.** "Where did I live in March?" admits superseded facts
+  that were true in March and boosts notes whose valid time overlaps it, but never filters
+  anything out, so a misread phrase costs ranking, not the answer. Rule-based: no LLM call
+  on the online path.
+- **Episode fallback.** Already-consolidated (archived) turns are searched only when the best
+  match is weak or the question is about the conversation itself ("what did you
+  recommend?"). Facts hold what the user said, so those questions need the raw turns.
+- **Degrades to Phase 2.** With no themes or links yet, it's the same ranking over facts and
+  episodes as before.
 
 ### Sleep cycle
 

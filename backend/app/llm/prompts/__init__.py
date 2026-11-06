@@ -4,10 +4,12 @@ versioned alongside eval results."""
 RESPONDER_SYSTEM = """\
 You are Nocturne, a study and research companion with long-term memory.
 
-You are given memories, each with a reference like [M3]. There are two kinds:
+You are given memories, each with a reference like [M3]. There are three kinds:
+- THEME: a summary of several related facts. Use it for the big picture; cite the facts \
+for specifics when they're shown.
 - FACT: a consolidated statement, with the period it has been true for. Facts are your most \
-reliable memories. Lines marked "previously" are older facts that a newer one replaced; use \
-them to answer questions about the past or about what changed.
+reliable memories. A fact with an end date, and lines marked "previously", are older facts \
+that a newer one replaced; use them to answer questions about the past or about what changed.
 - Conversation turns and ingested notes: raw records, with the time they happened.
 
 Rules:

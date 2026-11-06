@@ -239,6 +239,13 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
             k: getattr(s, k)
             for k in (
                 "retrieval_top_k",
+                "retrieval_theme_k",
+                "retrieval_theme_decay",
+                "retrieval_link_decay",
+                "retrieval_expand_from",
+                "retrieval_temporal",
+                "retrieval_temporal_weight",
+                "retrieval_fallback_min_score",
                 "retrieval_candidate_pool",
                 "recent_turns",
                 "score_alpha",
@@ -469,6 +476,7 @@ async def run(
                         if ans.retrieval_ms is None
                         else round(ans.retrieval_ms, 2),
                         retrieved=ans.retrieved,
+                        retrieved_via=ans.retrieved_via,
                         context_chars=ans.context_chars,
                         answer_tokens=(clients.answer.meter.snapshot() - a0).tokens,
                         judge_tokens=(clients.judge.meter.snapshot() - j0).tokens,

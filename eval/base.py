@@ -34,6 +34,7 @@ class SystemAnswer:
     retrieval_ms: float | None = None  # None: no retrieval step (full context)
     retrieved: int = 0
     context_chars: int = 0
+    retrieved_via: str = ""  # nocturne only: what retrieval returned, by tier and route
 
 
 class System(Protocol):

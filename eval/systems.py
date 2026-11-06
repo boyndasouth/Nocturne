@@ -41,13 +41,26 @@ class TimedRetriever(HierarchicalRetriever):
 
     last_ms: float = 0.0
     last_count: int = 0
+    last_via: str = ""
 
     async def retrieve(self, query: str, **kwargs: Any) -> list[ScoredNote]:
         t0 = time.perf_counter()
         out = await super().retrieve(query, **kwargs)
         self.last_ms = (time.perf_counter() - t0) * 1000
         self.last_count = len(out)
+        self.last_via = via_summary(out)
         return out
+
+
+def via_summary(notes: list[ScoredNote]) -> str:
+    """'theme:1 fact/search:3 fact/link:1 episode/search:3', for the results CSV."""
+    from collections import Counter
+
+    counts = Counter(
+        s.note.tier.value if s.note.tier.value == "theme" else f"{s.note.tier.value}/{s.via}"
+        for s in notes
+    )
+    return " ".join(f"{k}:{v}" for k, v in sorted(counts.items()))
 
 
 def _in_memory_checkpointer() -> Callable[[], Any]:
@@ -108,6 +121,7 @@ class NocturneSystem:
             recency_tau_days=settings.recency_tau_days,
             top_k=settings.retrieval_top_k,
             candidate_pool=settings.retrieval_candidate_pool,
+            config=settings.retrieval_config,
         )
         self._responder = Responder(
             llm=answer_llm,
@@ -170,6 +184,7 @@ class NocturneSystem:
             retrieval_ms=self._retriever.last_ms,
             retrieved=self._retriever.last_count,
             context_chars=len(result.context),
+            retrieved_via=self._retriever.last_via,
         )
 
     async def aclose(self) -> None:

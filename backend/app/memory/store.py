@@ -54,13 +54,21 @@ _N_COLUMNS = _select_columns("n.")
 # natural-language questions match almost nothing. Stop words are already removed.
 _OR_TSQUERY = "replace(plainto_tsquery('english', %(qtext)s)::text, ' & ', ' | ')::tsquery"
 
+# A superseded fact that was true at some point in [w_start, w_end): "where did I live in
+# March?" should find the March address even after a move (spec §5 temporal filter).
+_TRUE_DURING = """(
+    %(w_start)s::timestamptz is not null and n.status = 'superseded' and n.tier = 'fact'
+    and n.valid_from < %(w_end)s and coalesce(n.valid_to, 'infinity') > %(w_start)s
+)"""
+
 _HYBRID_SQL = f"""
 with q as (
     select %(qvec)s::vector as v, {_OR_TSQUERY} as tsq
 ),
 filtered as (
     select n.* from memory_notes n
-    where n.tier = any(%(tiers)s::note_tier[]) and n.status = any(%(statuses)s::note_status[])
+    where n.tier = any(%(tiers)s::note_tier[])
+      and (n.status = any(%(statuses)s::note_status[]) or {_TRUE_DURING})
       -- as-of transaction time: only what the system knew by then (benchmark replay)
       and (%(as_of)s::timestamptz is null or n.recorded_at <= %(as_of)s)
 ),
@@ -86,6 +94,14 @@ from memory_notes n join cand using (id), q
 
 def _note(row: dict[str, Any]) -> MemoryNote:
     return MemoryNote.model_validate(row)
+
+
+def _candidate(r: dict[str, Any]) -> Candidate:
+    return Candidate(
+        note=_note(r),
+        semantic_sim=float(r["semantic_sim"]),
+        keyword_score=float(r["keyword_score"]),
+    )
 
 
 def _floats(v: Any) -> list[float]:
@@ -190,9 +206,12 @@ class MemoryStore:
         statuses: Sequence[Status] = (Status.ACTIVE,),
         pool_size: int = 40,
         as_of: datetime | None = None,
+        true_during: tuple[datetime, datetime] | None = None,
     ) -> list[Candidate]:
         """Union of the top `pool_size` notes by vector distance and by full-text rank.
-        `as_of` hides notes recorded after that time."""
+        `as_of` hides notes recorded after that time. `true_during` also admits superseded
+        facts that were valid at some point in that window."""
+        w_start, w_end = true_during or (None, None)
         async with self._pool.connection() as conn:
             cur = await conn.execute(
                 _HYBRID_SQL,
@@ -203,17 +222,52 @@ class MemoryStore:
                     "statuses": [s.value for s in statuses],
                     "pool": pool_size,
                     "as_of": as_of,
+                    "w_start": w_start,
+                    "w_end": w_end,
                 },
             )
             rows = await cur.fetchall()
-        return [
-            Candidate(
-                note=_note(r),
-                semantic_sim=float(r["semantic_sim"]),
-                keyword_score=float(r["keyword_score"]),
+        return [_candidate(r) for r in rows]
+
+    async def score_notes(
+        self,
+        note_ids: Sequence[UUID],
+        query_vec: Sequence[float],
+        query_text: str,
+        *,
+        statuses: Sequence[Status] = (Status.ACTIVE,),
+        as_of: datetime | None = None,
+        true_during: tuple[datetime, datetime] | None = None,
+    ) -> list[Candidate]:
+        """Specific notes (reached by graph expansion) with the same similarity and keyword
+        scores hybrid search computes, under the same status / as-of / window rules."""
+        if not note_ids:
+            return []
+        w_start, w_end = true_during or (None, None)
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                f"""
+                with q as (select %(qvec)s::vector as v, {_OR_TSQUERY} as tsq)
+                select {_N_COLUMNS},
+                       coalesce(1 - (n.embedding <=> q.v), 0) as semantic_sim,
+                       ts_rank_cd(n.search_tsv, q.tsq, 32) as keyword_score
+                from memory_notes n, q
+                where n.id = any(%(ids)s)
+                  and (n.status = any(%(statuses)s::note_status[]) or {_TRUE_DURING})
+                  and (%(as_of)s::timestamptz is null or n.recorded_at <= %(as_of)s)
+                """,
+                {
+                    "qvec": _vec(query_vec),
+                    "qtext": query_text,
+                    "ids": list(note_ids),
+                    "statuses": [s.value for s in statuses],
+                    "as_of": as_of,
+                    "w_start": w_start,
+                    "w_end": w_end,
+                },
             )
-            for r in rows
-        ]
+            rows = await cur.fetchall()
+        return [_candidate(r) for r in rows]
 
     async def reinforce(self, note_ids: Sequence[UUID], *, now: datetime, eta: float) -> None:
         """Access reinforcement (spec §3.1). Access metadata isn't a content edit, so
