@@ -3,10 +3,11 @@
 A long-term memory agent. A fast online agent answers questions; an offline "sleep" agent
 consolidates, links, corrects, and prunes memories between sessions.
 
-**Status: Phase 3, step 1 of 4 (eval harness + baselines).** Chat with episode memory and
-hybrid retrieval, a checkpointed LangGraph sleep cycle that extracts facts, merges duplicates,
-and supersedes contradicted facts with bitemporal history, and a benchmark harness that
-compares it against baselines. Linking, themes, and forgetting come next in Phase 3.
+**Status: Phase 3, step 2 of 4 (Linker + Abstractor).** Chat with episode memory and hybrid
+retrieval, a checkpointed LangGraph sleep cycle that extracts facts, merges duplicates,
+supersedes contradicted facts with bitemporal history, links related facts and summarises
+clusters of facts into themes, and a benchmark harness that compares it against baselines.
+Next in Phase 3: the hierarchical retriever that uses links and themes, then forgetting.
 
 ## What works now
 
@@ -17,7 +18,9 @@ compares it against baselines. Linking, themes, and forgetting come next in Phas
 | bge-small embeddings + hybrid search (pgvector cosine ∪ Postgres full-text) | `backend/app/llm/embeddings.py`, `backend/app/memory/store.py` |
 | §5 scoring: `α·sim + β·keyword + γ·strength + δ·recency` | `backend/app/memory/scoring.py` |
 | `POST /chat`, `POST /ingest`, `GET /health` | `backend/app/api/` |
-| Sleep graph: Extractor → Deduplicator → Contradiction Resolver → Apply (LangGraph, Postgres checkpoints) | `backend/app/agents/sleep/` |
+| Sleep graph: Extractor → Deduplicator → Contradiction Resolver → Linker → Abstractor → Apply (LangGraph, Postgres checkpoints) | `backend/app/agents/sleep/` |
+| Linker: typed fact-to-fact links (`related`, `elaborates`, `example_of`, `caused_by`), batched LLM labelling | `backend/app/agents/sleep/linker.py` |
+| Abstractor: average-linkage clustering (numpy) → `theme` notes that track their members across cycles | `backend/app/agents/sleep/abstractor.py`, `cluster.py`, `migrations/003_links_themes.sql` |
 | Versioned edits: full-row JSON snapshot before every change; `supersedes` links; valid time vs. transaction time | `backend/app/memory/store.py`, `migrations/002_sleep_cycle.sql` |
 | `POST /sleep`, `GET /sleep/cycles[/{id}]`, idle/backlog trigger, GitHub Actions cron | `backend/app/api/sleep.py`, `backend/app/agents/sleep/trigger.py`, `.github/workflows/sleep-cron.yml` |
 | Responder sees current facts, plus the older facts they replaced, with dates | `backend/app/agents/responder.py` |
@@ -94,7 +97,7 @@ and the same Responder prompt, so the only difference between rows is the memory
 | `full-context` | Raw history in the prompt, newest first until `EVAL_FULL_CONTEXT_TOKENS` |
 | `naive-rag` | One chunk per turn, top-k cosine, nothing else |
 | `nocturne-no-sleep` | The real retriever (hybrid + §5 scoring + recent turns) over episodes |
-| `nocturne` | The same, after a sleep cycle at the end of every session |
+| `nocturne` | The same, after a sleep cycle at the end of every session (or every N-th: `EVAL_SLEEP_EVERY_SESSIONS`) |
 
 Judge: gpt-oss-20b with the official LongMemEval prompts; it agreed with hand labels on 20/20 sampled verdicts (two lenient calls on preference questions).
 
@@ -123,10 +126,12 @@ offline, memory items per episode), `results.csv` (every answer with its verdict
 - **Three quota buckets.** Answers use the online model (Groq), sleep uses Gemini, and the
   judge defaults to Groq `openai/gpt-oss-20b`, which has its own limits separate from the
   answer model. Override with `EVAL_JUDGE_PROVIDER` / `EVAL_JUDGE_MODEL`.
+- **Stops on a daily quota.** A 429 for a per-day limit (Gemini, Groq or OpenRouter) stops
+  the run at once instead of retrying; rerun after the reset.
 - **Datasets** download on first use into `eval/datasets/data/` (`--data-path` uses a local
   copy). Start with `longmemeval-oracle` (evidence sessions only); `longmemeval-s` has ~50
-  sessions per question and `locomo` ~27 per conversation, so sleep costs grow fast. Check
-  with `--plan`.
+  sessions per question and `locomo` ~27 per conversation, so sleep costs grow fast. Set
+  `EVAL_SLEEP_EVERY_SESSIONS=5` (or 10) for those, and check with `--plan`.
 
 Known limits: the full-context budget defaults to 5,000 tokens because Groq's free tier caps
 a single request at its 8K tokens-per-minute limit, so on long histories it's a "recent
@@ -171,8 +176,21 @@ CI (`.github/workflows/ci.yml`) runs everything against a pgvector service conta
   7; batches 1–6 aren't paid for again. Failed cycles are resumed (up to
   `SLEEP_MAX_ATTEMPTS`) before new work is picked up.
 - **All-or-nothing writes.** Every step before Apply only reads memory. Apply writes facts,
-  merges, supersessions, version snapshots, the episodes' `consolidated_in`, and the cycle's
-  `succeeded` status in one transaction, so a resumed cycle can't double-apply.
+  merges, supersessions, links, themes, version snapshots, the episodes' `consolidated_in`,
+  and the cycle's `succeeded` status in one transaction, so a resumed cycle can't
+  double-apply. The Linker and Abstractor plan against memory as it *will* be after the
+  cycle (new facts in, superseded ones out), which is what lets them join that transaction.
+- **Links read `src <type> dst`.** The LLM labels each pair as "NEW <type> EXISTING" and may
+  use the passive forms (`elaborated_by`, `has_example`, `causes`); those are stored with the
+  ends swapped. Pairs that are only on the same broad topic get no link.
+- **Themes are stable.** Facts are re-clustered every cycle (average linkage, so A~B and B~C
+  doesn't drag unrelated A and C together), and each cluster is matched to an existing theme
+  by member overlap. Only new clusters, and themes whose members changed or were superseded,
+  cost an LLM call; updates are versioned like any other edit. A theme is archived only once
+  fewer than `THEME_MIN_FACTS` of its facts are still active. Themes link to members with
+  `summarizes`.
+- **Daily quotas fail fast.** A per-day 429 raises `QuotaExhaustedError` instead of retrying,
+  so a cycle fails and backs off rather than hammering an exhausted quota.
 - **One cycle at a time, across processes.** A partial unique index allows a single `running`
   row in `sleep_cycles`; a cycle whose heartbeat stops (crashed process) is taken over after
   `SLEEP_STALE_MINUTES`.

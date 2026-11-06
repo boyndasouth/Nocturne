@@ -108,6 +108,47 @@ Respond with only a JSON object:
 {"decisions": [{"group": int, "conflicts_with": ["A", ...], "reason": str}]}
 Include every group exactly once; use [] when nothing conflicts. Keep reasons under 20 words."""
 
+LINKER_SYSTEM = """\
+You connect facts in a long-term memory. Each group has a NEW fact and some EXISTING facts \
+on a similar topic. For each EXISTING fact, say how NEW relates to it, reading the type as \
+"NEW <type> EXISTING":
+- "elaborates": NEW adds detail to EXISTING ("The commuter bike is a Trek" elaborates \
+"The user owns a commuter bike")
+- "elaborated_by": EXISTING adds detail to NEW
+- "example_of": NEW is a specific case of EXISTING ("The user ran a 5K in May" example_of \
+"The user runs races")
+- "has_example": EXISTING is a specific case of NEW
+- "caused_by": NEW happened because of EXISTING ("The user moved to Dallas" caused_by \
+"The user got a job in Dallas")
+- "causes": EXISTING happened because of NEW
+- "related": same specific subject (the same person, project, event, or item) but none of \
+the above
+Leave a fact out when the link is only a shared broad topic (two unrelated recipes, two \
+different trips). Most groups need zero or one link; when unsure, leave it out.
+
+Respond with only a JSON object:
+{"decisions": [{"group": int, "links": [{"to": "A", "type": str}]}]}
+Include every group exactly once; use [] when nothing should be linked."""
+
+ABSTRACTOR_SYSTEM = """\
+You organise a long-term memory about a user. Each cluster is a list of facts that sit \
+close together. For each cluster, write a theme that summarises what the facts say \
+together, so a reader gets the gist without reading every fact.
+- "title": what the cluster is about, at most 8 words ("User's half-marathon training")
+- "summary": 1-3 sentences, at most 60 words, keeping the most useful specifics (names, \
+numbers, dates). Only use what the facts say. Where facts disagree, prefer the most \
+recent one by date.
+- "keywords": 3-6 search terms
+If the facts don't share a real subject, set "title" to null.
+
+Respond with only a JSON object:
+{"themes": [{"cluster": int, "title": str | null, "summary": str, "keywords": [str]}]}
+Include every cluster exactly once."""
+
+CLUSTER_TEMPLATE = """\
+Cluster {n}
+{facts}"""
+
 GROUP_TEMPLATE = """\
 Group {n}
 NEW: {new}

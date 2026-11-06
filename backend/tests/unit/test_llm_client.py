@@ -174,3 +174,63 @@ def test_online_client_sends_reasoning_params_only_when_configured():
         Settings(**base, online_model="some-llama", online_reasoning_effort=""), Tracer()
     )
     assert llama._extra == {}
+
+
+GEMINI_DAILY = {
+    "error": {
+        "code": 429,
+        "message": "You exceeded your current quota, please check your plan and billing details.",
+        "status": "RESOURCE_EXHAUSTED",
+        "details": [
+            {
+                "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                "violations": [
+                    {
+                        "quotaMetric": "generativelanguage.googleapis.com/"
+                        "generate_content_free_tier_requests",
+                        "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+                        "quotaValue": "20",
+                    }
+                ],
+            },
+            {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "43s"},
+        ],
+    }
+}
+GEMINI_MINUTE = json.loads(
+    json.dumps(GEMINI_DAILY).replace("PerDay", "PerMinute").replace('"20"', '"10"')
+)
+
+
+def test_daily_quota_detection():
+    from app.llm.client import daily_quota_detail
+
+    detail = daily_quota_detail(json.dumps(GEMINI_DAILY))
+    assert detail == "quotaId=GenerateRequestsPerDayPerProjectPerModel-FreeTier, quotaValue=20"
+    assert daily_quota_detail(json.dumps(GEMINI_MINUTE)) is None
+    groq = (
+        "Rate limit reached for model `openai/gpt-oss-120b` on tokens per day (TPD): Limit 200000"
+    )
+    assert "tokens per day (TPD)" in daily_quota_detail(groq)
+    assert daily_quota_detail("Rate limit exceeded: free-models-per-day") is not None
+    assert daily_quota_detail("Rate limit reached on requests per minute (RPM)") is None
+
+
+async def test_daily_quota_429_fails_fast_without_retrying():
+    from app.llm.client import QuotaExhaustedError
+
+    sleeps = Sleeps()
+    client, seen = make_client(
+        [httpx.Response(429, json=GEMINI_DAILY), httpx.Response(200, json=ok_body())], sleeps
+    )
+    with pytest.raises(QuotaExhaustedError, match="quotaValue=20"):
+        await client.chat([{"role": "user", "content": "x"}])
+    assert len(seen) == 1 and sleeps.calls == []
+
+
+async def test_per_minute_429_is_still_retried():
+    client, seen = make_client(
+        [httpx.Response(429, json=GEMINI_MINUTE), httpx.Response(200, json=ok_body())], Sleeps()
+    )
+    assert (await client.chat([{"role": "user", "content": "x"}])).text == "hi"
+    assert len(seen) == 2

@@ -27,6 +27,7 @@ class LinkType(StrEnum):
     EXAMPLE_OF = "example_of"
     CAUSED_BY = "caused_by"
     SUPERSEDES = "supersedes"
+    SUMMARIZES = "summarizes"  # theme -> fact it summarises (Abstractor)
 
 
 class MemoryNote(BaseModel):

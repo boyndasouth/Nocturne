@@ -58,15 +58,26 @@ def _in_memory_checkpointer() -> Callable[[], Any]:
     return factory
 
 
+def sleep_points(session_ends: list, every: int) -> list:
+    """Every `every`-th session end, plus the last one (so nothing is left unconsolidated)."""
+    points = session_ends[every - 1 :: every]
+    if session_ends and (not points or points[-1] != session_ends[-1]):
+        points.append(session_ends[-1])
+    return points
+
+
 class NocturneSystem:
     """The real backend components against a dedicated eval database, reset before every
     conversation. Ingest writes episodes exactly as the Episode Writer would (same format,
     valid time = transaction time = turn time) but in one batch, with no LLM calls.
 
-    With sleep on, a cycle runs at the end of every session, with the cycle clock set to the
-    session's last turn (spec §9 protocol). Ingesting everything first and then sleeping in
-    session order is equivalent to interleaving: a cycle only consolidates episodes recorded
-    by its clock, and it only reads facts written by earlier cycles."""
+    With sleep on, a cycle runs at the end of every `sleep_every`-th session (and after the
+    last one), with the cycle clock set to that session's last turn. sleep_every=1 is the
+    spec §9 protocol, a sleep between sessions; a larger value is the same protocol with
+    longer days, which keeps 50-session LongMemEval-S haystacks within a free daily quota.
+    Ingesting everything first and then sleeping in session order is equivalent to
+    interleaving: a cycle only consolidates episodes recorded by its clock, and it only reads
+    facts and themes written by earlier cycles."""
 
     def __init__(
         self,
@@ -79,6 +90,7 @@ class NocturneSystem:
         answer_llm: LLMClient,
         sleep_llm: LLMClient | None,
         sleep: bool,
+        sleep_every: int = 1,
     ) -> None:
         if sleep and sleep_llm is None:
             raise ValueError(f"{name}: sleep=True needs a sleep LLM")
@@ -87,6 +99,7 @@ class NocturneSystem:
         self._db = db
         self._embedder = embedder
         self._sleep = sleep
+        self._sleep_every = max(1, sleep_every)
         self._store = MemoryStore(pool)
         self._retriever = TimedRetriever(
             self._store,
@@ -141,7 +154,7 @@ class NocturneSystem:
             ]
         )
         if self._runner is not None:
-            for end in conv.session_ends():
+            for end in sleep_points(conv.session_ends(), self._sleep_every):
                 # A session over sleep_max_episodes is consolidated over several cycles.
                 while await self._runner.run_once(clock=end) is not None:
                     pass

@@ -11,14 +11,17 @@ from collections.abc import Sequence
 
 from app.llm.client import ChatMessage, LLMResponse
 from app.llm.prompts import (
+    ABSTRACTOR_SYSTEM,
     CONTRADICTION_SYSTEM,
     DEDUP_SYSTEM,
     EXTRACTOR_SYSTEM,
+    LINKER_SYSTEM,
     RESPONDER_SYSTEM,
 )
 
 _EPISODE_RE = re.compile(r"^\[(\d+)\] \([^)]*\)\n(.*?)(?=^\[\d+\] |\Z)", re.M | re.S)
 _GROUP_RE = re.compile(r"^Group (\d+)$", re.M)
+_CLUSTER_RE = re.compile(r"^Cluster (\d+)\n- \([^)]*\) (.*)$", re.M)
 _MEMORY_RE = re.compile(r"^\s*\[M\d+\][^)]*\)\s*(.+)$", re.M)
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
@@ -67,6 +70,26 @@ class FakeLLM:
             return json.dumps(
                 {"decisions": [{"group": g, "conflicts_with": [], "reason": ""} for g in groups]}
             )
+        if system == LINKER_SYSTEM:
+            groups = [int(g) for g in _GROUP_RE.findall(user)]
+            return json.dumps(
+                {
+                    "decisions": [
+                        {"group": g, "links": [{"to": "A", "type": "related"}]} for g in groups
+                    ]
+                }
+            )
+        if system == ABSTRACTOR_SYSTEM:
+            themes = [
+                {
+                    "cluster": int(n),
+                    "title": " ".join(first.split()[:5]),
+                    "summary": first[:200],
+                    "keywords": first.split()[:3],
+                }
+                for n, first in _CLUSTER_RE.findall(user)
+            ]
+            return json.dumps({"themes": themes})
         if system == RESPONDER_SYSTEM:
             hits = _MEMORY_RE.findall(user)
             return hits[0][:400] if hits else "I don't have that in memory."

@@ -49,6 +49,7 @@ from eval.runner import (  # noqa: E402
     run_fingerprint,
     write_config,
 )
+from eval.systems import sleep_points  # noqa: E402
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -93,7 +94,9 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
-def plan(conversations: Sequence[datasets.Conversation], systems: Sequence[str]) -> str:
+def plan(
+    conversations: Sequence[datasets.Conversation], systems: Sequence[str], sleep_every: int = 1
+) -> str:
     """What a run will cost, before spending anything. Sleep calls are a floor: one
     extraction per cycle, plus dedup/contradiction batches when similar facts exist."""
     from collections import Counter
@@ -109,9 +112,10 @@ def plan(conversations: Sequence[datasets.Conversation], systems: Sequence[str])
         f"answer calls: {n_q * len(systems)}   judge calls: {n_q * len(systems)}",
     ]
     if "nocturne" in systems:
+        cycles = sum(len(sleep_points(c.session_ends(), sleep_every)) for c in conversations)
         lines.append(
-            f"sleep cycles: {sessions}   sleep calls: >= {sessions} "
-            "(more when facts need dedup/conflict judging)"
+            f"sleep cycles: {cycles} (every {sleep_every} session(s))   sleep calls: >= {cycles}"
+            " (up to ~4x with dedup, conflict, link and theme judging)"
         )
     return "\n".join(lines)
 
@@ -151,7 +155,7 @@ async def amain(args: argparse.Namespace) -> int:
     if not n_questions:
         raise SystemExit("no questions match the selection")
     if args.plan:
-        print(plan(conversations, cfg.systems))
+        print(plan(conversations, cfg.systems, es.sleep_every_sessions))
         return 0
 
     needs_db = bool(NOCTURNE_SYSTEMS & set(cfg.systems))

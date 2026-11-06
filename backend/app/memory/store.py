@@ -88,6 +88,13 @@ def _note(row: dict[str, Any]) -> MemoryNote:
     return MemoryNote.model_validate(row)
 
 
+def _floats(v: Any) -> list[float]:
+    """A pgvector value as floats: a Vector object, a numpy array, or a list."""
+    if hasattr(v, "to_list"):
+        v = v.to_list()
+    return [float(x) for x in v]
+
+
 def _vec(values: Sequence[float]) -> np.ndarray:
     return np.asarray(values, dtype=np.float32)
 
@@ -326,8 +333,9 @@ class MemoryStore:
         *,
         cycle_id: UUID | None,
         weight: float = 1.0,
-    ) -> None:
-        await conn.execute(
+    ) -> bool:
+        """True if the link is new (an existing identical link is left as it is)."""
+        cur = await conn.execute(
             """
             insert into memory_links (src_id, dst_id, link_type, weight, created_by_cycle)
             values (%s, %s, %s::link_type, %s, %s)
@@ -335,6 +343,40 @@ class MemoryStore:
             """,
             (src_id, dst_id, link_type.value, weight, cycle_id),
         )
+        return cur.rowcount == 1
+
+    async def replace_theme_members_tx(
+        self,
+        conn: psycopg.AsyncConnection,
+        theme_id: UUID,
+        member_ids: Sequence[UUID],
+        *,
+        cycle_id: UUID | None,
+    ) -> None:
+        """Make `member_ids` exactly the facts this theme summarises. Links are derived
+        structure, not memory content: the theme's own text is versioned by edit_note."""
+        await conn.execute(
+            "delete from memory_links where src_id = %s and link_type = 'summarizes'",
+            (theme_id,),
+        )
+        for m in dict.fromkeys(member_ids):
+            await self.add_link(conn, theme_id, m, LinkType.SUMMARIZES, cycle_id=cycle_id)
+
+    async def links_of(
+        self, note_ids: Sequence[UUID], *, types: Sequence[LinkType] | None = None
+    ) -> list[dict[str, Any]]:
+        """Links touching any of `note_ids`, in either direction."""
+        if not note_ids:
+            return []
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                "select src_id, dst_id, link_type::text as link_type, weight, created_by_cycle"
+                " from memory_links where (src_id = any(%(ids)s) or dst_id = any(%(ids)s))"
+                " and (%(types)s::text[] is null or link_type::text = any(%(types)s))"
+                " order by src_id, dst_id, link_type",
+                {"ids": list(note_ids), "types": [t.value for t in types] if types else None},
+            )
+            return list(await cur.fetchall())
 
     async def versions(self, note_id: UUID) -> list[VersionRecord]:
         async with self._pool.connection() as conn:
@@ -413,6 +455,39 @@ class MemoryStore:
                 rows = await cur.fetchall()
                 out.append([Neighbor(note=_note(r), sim=float(r["sim"])) for r in rows])
         return out
+
+    async def active_fact_vectors(self, *, limit: int) -> list[tuple[MemoryNote, list[float]]]:
+        """Active facts with their embeddings, newest first, for clustering."""
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                f"""
+                select {NOTE_COLUMNS}, embedding from memory_notes
+                where tier = 'fact' and status = 'active' and embedding is not null
+                order by recorded_at desc, id
+                limit %s
+                """,
+                (limit,),
+            )
+            rows = await cur.fetchall()
+        return [(_note(r), _floats(r["embedding"])) for r in rows]
+
+    async def active_themes(self) -> list[tuple[MemoryNote, list[UUID]]]:
+        """Active themes with the ids of every fact they summarise."""
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                f"""
+                select {_N_COLUMNS},
+                    coalesce(array_agg(l.dst_id order by l.dst_id)
+                             filter (where l.dst_id is not null), '{{}}') as members
+                from memory_notes n
+                left join memory_links l on l.src_id = n.id and l.link_type = 'summarizes'
+                where n.tier = 'theme' and n.status = 'active'
+                group by n.id
+                order by n.recorded_at, n.id
+                """
+            )
+            rows = await cur.fetchall()
+        return [(_note(r), list(r["members"])) for r in rows]
 
     async def superseded_history(
         self, note_ids: Sequence[UUID], *, depth: int = 3

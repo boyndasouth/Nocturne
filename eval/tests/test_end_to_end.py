@@ -87,3 +87,32 @@ def test_refuses_a_database_that_is_not_disposable(eval_env, monkeypatch):
 
     with pytest.raises(UnsafeDatabaseError):
         main([*ARGS, "--run-name", "unsafe"])
+
+
+def test_daily_quota_stops_the_run_on_the_first_error(eval_env, monkeypatch):
+    from app.llm.client import QuotaExhaustedError
+    from eval.fake import FakeLLM
+
+    async def no_quota(self, messages, **kwargs):
+        if self.name == "fake-sleep":
+            raise QuotaExhaustedError("gemini: daily quota used up for gemini-x")
+        return await original(self, messages, **kwargs)
+
+    original = FakeLLM.chat
+    monkeypatch.setattr(FakeLLM, "chat", no_quota)
+    assert main([*ARGS, "--run-name", "quota", "--max-errors", "10"]) == 2
+    rows = _csv(eval_env / "quota" / "results.csv")
+    errors = [r for r in rows if r["status"] == "error"]
+    assert len(errors) == 1 and errors[0]["system"] == "nocturne"  # stopped at once
+
+
+def test_linker_and_abstractor_run_in_the_eval(eval_env, monkeypatch):
+    monkeypatch.setenv("EVAL_SLEEP_EVERY_SESSIONS", "2")
+    monkeypatch.setenv("THEME_SIM", "0.05")  # hash embeddings: let the fixture cluster
+    monkeypatch.setenv("THEME_MIN_FACTS", "2")
+    monkeypatch.setenv("LINK_SIM", "0.05")
+    assert main([*ARGS, "--run-name", "structure", "--systems", "nocturne"]) == 0
+    convs = {c["conversation_id"]: c for c in _csv(eval_env / "structure" / "conversations.csv")}
+    ku = convs["ku_001"]  # 2 sessions, 3 user turns
+    assert ku["sleep_cycles"] == "1"  # every 2 sessions -> one cycle
+    assert int(ku["links"]) > 0 and int(ku["memory_theme"]) > 0

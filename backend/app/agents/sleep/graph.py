@@ -1,12 +1,17 @@
 """The sleep graph (spec §3.2), built with LangGraph.
 
-    extract ⟲ ─► dedup_prepare ─► dedup_judge ⟲ ─► conflict_prepare ─► conflict_judge ⟲ ─► apply
+    extract ⟲ ─► dedup_prepare ─► dedup_judge ⟲ ─► conflict_prepare ─► conflict_judge ⟲
+      ─► link_prepare ─► link_judge ⟲ ─► theme_prepare ─► theme_judge ⟲ ─► apply
 
 ⟲ = one LLM batch per step. LangGraph checkpoints after every step, so a cycle that fails
 on a rate limit resumes at the batch that failed instead of re-spending quota on the ones that
 succeeded. Every step before `apply` only reads memory; `apply` writes it in one transaction.
 
-Phase 3 adds Linker, Abstractor, Forgetter, and Auditor between conflict_judge and the end.
+The Linker and Abstractor plan against the memory as it *will* be once this cycle applies
+(new facts in, superseded ones out), which `plan_apply` can compute before anything is
+written. That's what lets their output join the same transaction.
+
+Phase 3 step 4 adds the Forgetter and Auditor.
 """
 
 from __future__ import annotations
@@ -21,17 +26,30 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.agents.sleep.apply import apply_plan, plan_apply
+from app.agents.sleep.abstractor import (
+    AbstractConfig,
+    ExistingTheme,
+    plan_themes,
+    summarise_clusters,
+)
+from app.agents.sleep.apply import ApplyPlan, StructurePlan, apply_plan, plan_apply
 from app.agents.sleep.contradiction import judge_conflicts
 from app.agents.sleep.dedup import DedupThresholds, judge_duplicates, plan_dedup
 from app.agents.sleep.extractor import batch_episodes, extract_batch
 from app.agents.sleep.judge import chunks, cosine_matrix, neighbor_lists
+from app.agents.sleep.linker import judge_links
 from app.agents.sleep.state import (
+    ClusterFact,
     Conflict,
     EpisodeIn,
     FactCandidate,
     Group,
+    Link,
     SleepState,
+    ThemePlan,
+    ThemeText,
+    cand_ref,
+    note_ref,
     parse_ref,
 )
 from app.config import Settings
@@ -53,6 +71,12 @@ class SleepConfig:
     conflict_sim: float = 0.65
     enable_dedup: bool = True
     enable_contradiction: bool = True
+    enable_linker: bool = True
+    link_sim: float = 0.70
+    enable_abstractor: bool = True
+    abstract: AbstractConfig = AbstractConfig()
+    theme_batch_clusters: int = 6
+    theme_max_facts: int = 2000
     max_tokens: int = 8192
     reinforce_eta: float = 0.2
 
@@ -67,6 +91,18 @@ class SleepConfig:
             conflict_sim=s.conflict_sim,
             enable_dedup=s.enable_dedup,
             enable_contradiction=s.enable_contradiction,
+            enable_linker=s.enable_linker,
+            link_sim=s.link_sim,
+            enable_abstractor=s.enable_abstractor,
+            abstract=AbstractConfig(
+                threshold=s.theme_sim,
+                min_size=s.theme_min_facts,
+                match_overlap=s.theme_match_overlap,
+                max_per_cycle=s.theme_max_per_cycle,
+                facts_per_theme=s.theme_facts_shown,
+            ),
+            theme_batch_clusters=s.theme_batch_clusters,
+            theme_max_facts=s.theme_max_facts,
             max_tokens=s.sleep_max_tokens,
             reinforce_eta=s.reinforce_eta,
         )
@@ -185,12 +221,29 @@ def build_sleep_graph(
             **_usage(state, usage),
         }
 
-    def has_more(groups_key: str, cursor_key: str, then: str, loop: str) -> Callable[..., str]:
+    def has_more(
+        groups_key: str, cursor_key: str, then: str, loop: str, size: int | None = None
+    ) -> Callable[..., str]:
         def route(state: SleepState) -> str:
-            n = len(chunks(state.get(groups_key, []), cfg.judge_batch_groups))  # type: ignore[arg-type]
+            n = len(chunks(state.get(groups_key, []), size or cfg.judge_batch_groups))  # type: ignore[arg-type]
             return loop if state.get(cursor_key, 0) < n else then
 
         return route
+
+    async def view(state: SleepState) -> tuple[ApplyPlan, dict[UUID, datetime], set[str]]:
+        """The apply plan for the decisions so far, the valid_from of every existing note it
+        references, and the refs it supersedes: memory as it will be after this cycle."""
+        cands = _candidates(state)
+        conflicts = [Conflict.model_validate(c) for c in state.get("conflicts", [])]
+        duplicates: dict[str, str] = state.get("duplicates", {})
+        refs = [*duplicates.values(), *(c.new for c in conflicts), *(c.old for c in conflicts)]
+        note_ids = list(dict.fromkeys(UUID(v) for k, v in map(parse_ref, refs) if k == "n"))
+        notes = await deps.store.notes_by_ids(note_ids)
+        if len(notes) != len(note_ids):
+            raise RuntimeError("a fact referenced by this cycle no longer exists")
+        valid_from = {n.id: n.valid_from for n in notes}
+        plan = plan_apply(cands, duplicates, conflicts, valid_from)
+        return plan, valid_from, {sp.loser for sp in plan.supersessions}
 
     # --- 3. Contradiction Resolver ------------------------------------------------------------
 
@@ -236,20 +289,119 @@ def build_sleep_graph(
             **_usage(state, usage),
         }
 
+    # --- 4. Linker ----------------------------------------------------------------------------
+
+    async def link_prepare(state: SleepState) -> dict[str, Any]:
+        empty = {"link_groups": [], "link_cursor": 0, "links": []}
+        if not cfg.enable_linker:
+            return empty
+        cands = _candidates(state)
+        plan, _, losers = await view(state)
+        keep = {p.key for p in plan.inserts if cand_ref(p.key) not in losers}
+        eligible = [c.key in keep for c in cands]
+        if not any(eligible):
+            return empty
+        vecs = await aembed_documents(deps.embedder, [c.content for c in cands])
+        probes = [v for v, e in zip(vecs, eligible, strict=True) if e]
+        found = await deps.store.nearest_active_facts(
+            probes, k=cfg.neighbors_k + len(losers), min_sim=cfg.link_sim
+        )
+        it = iter(found)
+        existing = [
+            [n for n in next(it) if note_ref(n.note.id) not in losers] if e else []
+            for e in eligible
+        ]
+        neighbors = neighbor_lists(
+            cands,
+            cosine_matrix(vecs),
+            existing,
+            min_sim=cfg.link_sim,
+            k=cfg.neighbors_k,
+            eligible=eligible,
+        )
+        groups = [
+            Group(key=c.key, content=c.content, valid_from=c.valid_from, neighbors=n)
+            for c, n in zip(cands, neighbors, strict=True)
+            if n
+        ]
+        return {**empty, "link_groups": [g.model_dump(mode="json") for g in groups]}
+
+    async def link_judge(state: SleepState) -> dict[str, Any]:
+        groups = [Group.model_validate(g) for g in state["link_groups"]]
+        batches = chunks(groups, cfg.judge_batch_groups)
+        cursor = state["link_cursor"]
+        found, usage = await judge_links(deps.llm, batches[cursor], max_tokens=cfg.max_tokens)
+        return {
+            "links": [*state.get("links", []), *(lk.model_dump(mode="json") for lk in found)],
+            "link_cursor": cursor + 1,
+            **_usage(state, usage),
+        }
+
+    # --- 5. Abstractor ------------------------------------------------------------------------
+
+    async def theme_prepare(state: SleepState) -> dict[str, Any]:
+        empty = {"theme_plans": [], "theme_cursor": 0, "theme_texts": {}, "themes_retired": []}
+        if not cfg.enable_abstractor:
+            return empty
+        plan, _, losers = await view(state)
+        existing = await deps.store.active_fact_vectors(limit=cfg.theme_max_facts)
+        facts: list[ClusterFact] = []
+        vectors: list[list[float]] = []
+        for note, vec in existing:
+            if note_ref(note.id) not in losers:
+                facts.append(
+                    ClusterFact(
+                        ref=note_ref(note.id), content=note.content, valid_from=note.valid_from
+                    )
+                )
+                vectors.append(vec)
+        new = [p for p in plan.inserts if cand_ref(p.key) not in losers]
+        vectors.extend(await aembed_documents(deps.embedder, [p.content for p in new]))
+        facts.extend(
+            ClusterFact(ref=cand_ref(p.key), content=p.content, valid_from=p.valid_from)
+            for p in new
+        )
+        themes = [
+            ExistingTheme(id=t.id, content=t.content, members=tuple(members))
+            for t, members in await deps.store.active_themes()
+        ]
+        plans, retired = plan_themes(facts, vectors, themes, cfg.abstract)
+        return {
+            **empty,
+            "theme_plans": [p.model_dump(mode="json") for p in plans],
+            "themes_retired": [str(t) for t in retired],
+        }
+
+    async def theme_judge(state: SleepState) -> dict[str, Any]:
+        plans = [ThemePlan.model_validate(p) for p in state["theme_plans"]]
+        batches = chunks(plans, cfg.theme_batch_clusters)
+        cursor = state["theme_cursor"]
+        texts, usage = await summarise_clusters(
+            deps.llm, batches[cursor], max_tokens=cfg.max_tokens
+        )
+        return {
+            "theme_texts": {
+                **state.get("theme_texts", {}),
+                **{k: v.model_dump(mode="json") for k, v in texts.items()},
+            },
+            "theme_cursor": cursor + 1,
+            **_usage(state, usage),
+        }
+
     # --- Apply (single transaction) -----------------------------------------------------------
 
     async def apply(state: SleepState) -> dict[str, Any]:
-        cands = _candidates(state)
-        conflicts = [Conflict.model_validate(c) for c in state.get("conflicts", [])]
-        duplicates: dict[str, str] = state.get("duplicates", {})
-        refs = [*duplicates.values(), *(c.new for c in conflicts), *(c.old for c in conflicts)]
-        note_ids = list(dict.fromkeys(UUID(v) for k, v in map(parse_ref, refs) if k == "n"))
-        notes = await deps.store.notes_by_ids(note_ids)
-        if len(notes) != len(note_ids):
-            raise RuntimeError("a fact referenced by this cycle no longer exists")
-        valid_from = {n.id: n.valid_from for n in notes}
-
-        plan = plan_apply(cands, duplicates, conflicts, valid_from)
+        plan, valid_from, _ = await view(state)
+        texts = {k: ThemeText.model_validate(v) for k, v in state.get("theme_texts", {}).items()}
+        structure = StructurePlan(
+            links=[Link.model_validate(lk) for lk in state.get("links", [])],
+            themes=[
+                (tp, texts[tp.key])
+                for tp in (ThemePlan.model_validate(p) for p in state.get("theme_plans", []))
+                if tp.key in texts
+            ],
+            retired_themes=[UUID(t) for t in state.get("themes_retired", [])],
+        )
         result = await apply_plan(
             plan,
             store=deps.store,
@@ -262,12 +414,17 @@ def build_sleep_graph(
             reinforce_eta=cfg.reinforce_eta,
             tokens_used=state.get("tokens", 0),
             llm_calls=state.get("llm_calls", 0),
+            structure=structure,
         )
         return {
             "result": {
                 "facts_created": result.facts_created,
                 "merges": result.merges,
                 "supersessions": result.supersessions,
+                "links_created": result.links_created,
+                "themes_created": result.themes_created,
+                "themes_updated": result.themes_updated,
+                "themes_archived": result.themes_archived,
             }
         }
 
@@ -278,6 +435,10 @@ def build_sleep_graph(
         ("dedup_judge", dedup_judge),
         ("conflict_prepare", conflict_prepare),
         ("conflict_judge", conflict_judge),
+        ("link_prepare", link_prepare),
+        ("link_judge", link_judge),
+        ("theme_prepare", theme_prepare),
+        ("theme_judge", theme_judge),
         ("apply", apply),
     ]:
         g.add_node(name, traced(name, fn))
@@ -286,8 +447,18 @@ def build_sleep_graph(
     dedup_route = has_more("dedup_groups", "dedup_cursor", "conflict_prepare", "dedup_judge")
     g.add_conditional_edges("dedup_prepare", dedup_route, ["dedup_judge", "conflict_prepare"])
     g.add_conditional_edges("dedup_judge", dedup_route, ["dedup_judge", "conflict_prepare"])
-    conflict_route = has_more("conflict_groups", "conflict_cursor", "apply", "conflict_judge")
-    g.add_conditional_edges("conflict_prepare", conflict_route, ["conflict_judge", "apply"])
-    g.add_conditional_edges("conflict_judge", conflict_route, ["conflict_judge", "apply"])
+    conflict_route = has_more(
+        "conflict_groups", "conflict_cursor", "link_prepare", "conflict_judge"
+    )
+    g.add_conditional_edges("conflict_prepare", conflict_route, ["conflict_judge", "link_prepare"])
+    g.add_conditional_edges("conflict_judge", conflict_route, ["conflict_judge", "link_prepare"])
+    link_route = has_more("link_groups", "link_cursor", "theme_prepare", "link_judge")
+    g.add_conditional_edges("link_prepare", link_route, ["link_judge", "theme_prepare"])
+    g.add_conditional_edges("link_judge", link_route, ["link_judge", "theme_prepare"])
+    theme_route = has_more(
+        "theme_plans", "theme_cursor", "apply", "theme_judge", size=cfg.theme_batch_clusters
+    )
+    g.add_conditional_edges("theme_prepare", theme_route, ["theme_judge", "apply"])
+    g.add_conditional_edges("theme_judge", theme_route, ["theme_judge", "apply"])
     g.add_edge("apply", END)
     return g.compile(checkpointer=checkpointer)

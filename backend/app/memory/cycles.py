@@ -32,6 +32,9 @@ class SleepCycle(BaseModel):
     merges: int
     supersessions: int
     archived: int
+    links_created: int = 0
+    themes_created: int = 0
+    themes_updated: int = 0
     tokens_used: int
     llm_calls: int
     attempts: int
@@ -41,8 +44,8 @@ class SleepCycle(BaseModel):
 
 _COLS = (
     "cycle_id, started_at, finished_at, status::text as status, clock, episode_ids,"
-    " episodes_processed, facts_created, merges, supersessions, archived, tokens_used,"
-    " llm_calls, attempts, heartbeat_at, error"
+    " episodes_processed, facts_created, merges, supersessions, archived, links_created,"
+    " themes_created, themes_updated, tokens_used, llm_calls, attempts, heartbeat_at, error"
 )
 
 
@@ -139,6 +142,10 @@ class CycleStore:
         supersessions: int,
         tokens_used: int,
         llm_calls: int,
+        links_created: int = 0,
+        themes_created: int = 0,
+        themes_updated: int = 0,
+        archived: int = 0,
     ) -> None:
         """Mark success inside the apply transaction, so memory changes and the cycle's
         status commit together."""
@@ -146,6 +153,7 @@ class CycleStore:
             """
             update sleep_cycles set status = 'succeeded', finished_at = now(), error = null,
                 episodes_processed = %s, facts_created = %s, merges = %s, supersessions = %s,
+                links_created = %s, themes_created = %s, themes_updated = %s, archived = %s,
                 tokens_used = %s, llm_calls = %s
             where cycle_id = %s
             """,
@@ -154,6 +162,10 @@ class CycleStore:
                 facts_created,
                 merges,
                 supersessions,
+                links_created,
+                themes_created,
+                themes_updated,
+                archived,
                 tokens_used,
                 llm_calls,
                 cycle_id,

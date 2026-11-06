@@ -58,6 +58,7 @@ CONVERSATION_FIELDS = (
     "facts_created",
     "merges",
     "supersessions",
+    "links",
     "prep_seconds",
     "sleep_tokens",
     "sleep_calls",

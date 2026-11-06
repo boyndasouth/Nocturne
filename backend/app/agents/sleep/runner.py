@@ -183,12 +183,17 @@ class SleepRunner:
         done = await self._cycles.get(cycle_id)
         assert done is not None
         log.info(
-            "sleep cycle %s: %d episodes -> %d facts, %d merges, %d supersessions",
+            "sleep cycle %s: %d episodes -> %d facts, %d merges, %d supersessions, %d links,"
+            " %d new / %d updated themes, %d archived",
             cycle_id,
             done.episodes_processed,
             done.facts_created,
             done.merges,
             done.supersessions,
+            done.links_created,
+            done.themes_created,
+            done.themes_updated,
+            done.archived,
         )
         return done
 

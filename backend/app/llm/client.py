@@ -46,6 +46,31 @@ class RetryableLLMError(LLMError):
         self.retry_after = retry_after
 
 
+class QuotaExhaustedError(LLMError):
+    """A 429 for a *daily* quota. Retrying within minutes can't help, so it isn't retried:
+    callers fail fast (the eval stops, a sleep cycle fails and backs off)."""
+
+
+# Gemini quota ids ("GenerateRequestsPerDayPerProjectPerModel-FreeTier"), Groq messages
+# ("tokens per day (TPD)"), OpenRouter ("free-models-per-day").
+_DAILY_QUOTA_RE = re.compile(r"per[\s_-]?day|\((?:TPD|RPD)\)", re.IGNORECASE)
+_QUOTA_FIELD_RE = re.compile(r'"(quotaId|quotaValue)"\s*:\s*"([^"]+)"')
+
+
+def daily_quota_detail(body: str) -> str | None:
+    """None unless `body` (a 429 response) is about a per-day limit; otherwise a short
+    description, with Gemini's quota id and value when present."""
+    if not _DAILY_QUOTA_RE.search(body):
+        return None
+    fields = dict(_QUOTA_FIELD_RE.findall(body))
+    if fields:
+        return ", ".join(f"{k}={v}" for k, v in fields.items())
+    m = _DAILY_QUOTA_RE.search(body)
+    assert m is not None
+    start = max(0, m.start() - 120)
+    return " ".join(body[start : m.end() + 80].split())
+
+
 class LLMClient(Protocol):
     name: str
     model: str
@@ -213,6 +238,11 @@ class OpenAICompatClient:
             raise RetryableLLMError(f"{self.name}: transport error: {exc!r}") from exc
         latency_ms = (time.perf_counter() - t0) * 1000
 
+        if r.status_code == 429 and (detail := daily_quota_detail(r.text)):
+            raise QuotaExhaustedError(
+                f"{self.name}: daily quota used up for {self.model} ({detail}). Wait for it to "
+                "reset (Gemini: midnight Pacific time) or switch to a model with its own quota."
+            )
         if r.status_code in RETRYABLE_STATUS:
             raise RetryableLLMError(
                 f"{self.name}: HTTP {r.status_code}: {r.text[:300]}", parse_retry_after(r)

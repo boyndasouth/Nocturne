@@ -59,8 +59,13 @@ class EvalDatabase:
                 " from sleep_cycles where status = 'succeeded'"
             )
             cyc = await cur.fetchone()
+            cur = await conn.execute(
+                "select count(*) as n from memory_links"
+                " where link_type not in ('supersedes', 'summarizes')"
+            )
+            links = await cur.fetchone()
         by_tier = {r["tier"]: int(r["n"]) for r in rows}
-        assert cyc is not None
+        assert cyc is not None and links is not None
         return PrepStats(
             memory_items=sum(by_tier.values()),
             memory_chars=sum(int(r["c"]) for r in rows),
@@ -69,4 +74,5 @@ class EvalDatabase:
             facts_created=int(cyc["facts"]),
             merges=int(cyc["merges"]),
             supersessions=int(cyc["sups"]),
+            links=int(links["n"]),
         )

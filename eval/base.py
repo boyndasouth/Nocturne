@@ -24,6 +24,7 @@ class PrepStats:
     facts_created: int = 0
     merges: int = 0
     supersessions: int = 0
+    links: int = 0  # Linker links between facts (not supersedes / theme membership)
     seconds: float = 0.0
 
 

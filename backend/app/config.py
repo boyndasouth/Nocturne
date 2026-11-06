@@ -38,7 +38,8 @@ class Settings(BaseSettings):
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     openrouter_api_key: SecretStr | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    sleep_model: str = "gemini-2.5-flash"
+    # ~500 free requests/day vs ~20 for the Flash models (per-model limits; check AI Studio).
+    sleep_model: str = "gemini-3.5-flash-lite"
     sleep_rpm: int = 8
     sleep_max_tokens: int = 8192  # JSON outputs for a whole batch, plus any thinking tokens
     # Passed as `reasoning_effort` when set (Gemini's OpenAI endpoint accepts it).
@@ -93,6 +94,18 @@ class Settings(BaseSettings):
     # Ablation switches (spec §9).
     enable_dedup: bool = True
     enable_contradiction: bool = True
+    # Linker (spec §3.2 step 4): new facts are linked to active facts at least this similar.
+    enable_linker: bool = True
+    link_sim: float = 0.70
+    # Abstractor (step 5): average-linkage clusters of active facts become themes.
+    enable_abstractor: bool = True
+    theme_sim: float = 0.72  # average cosine similarity within a cluster
+    theme_min_facts: int = 3
+    theme_match_overlap: float = 0.5  # share of members for a cluster to keep its theme
+    theme_max_per_cycle: int = 12  # themes (re)written per cycle; the rest wait
+    theme_batch_clusters: int = 6  # clusters per LLM call
+    theme_facts_shown: int = 25  # members the LLM sees per cluster
+    theme_max_facts: int = 2000  # newest active facts considered for clustering
 
     @property
     def score_weights(self) -> ScoreWeights:

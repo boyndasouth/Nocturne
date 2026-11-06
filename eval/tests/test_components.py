@@ -224,3 +224,32 @@ def test_summarize_category_accuracy_task_average_and_errors():
     assert (tot["memory_ratio"], tot["sleep_tokens"]) == (0.4, 100)
     table = format_table(summary, [tot])
     assert "ku" in table and "50% (1/2)" in table and "task-averaged" in table
+
+
+# --- Sleep cadence and quota stop -----------------------------------------------------------
+
+
+def test_sleep_points_every_n_sessions_always_ends_with_the_last():
+    from eval.systems import sleep_points
+
+    ends = list(range(1, 8))
+    assert sleep_points(ends, 1) == ends
+    assert sleep_points(ends, 3) == [3, 6, 7]
+    assert sleep_points(ends, 7) == [7]
+    assert sleep_points(ends, 50) == [7]
+    assert sleep_points([], 5) == []
+
+
+def test_quota_error_is_found_through_wrapped_exceptions():
+    from app.llm.client import QuotaExhaustedError
+    from eval.runner import quota_error
+
+    quota = QuotaExhaustedError("gemini: daily quota used up")
+    try:
+        try:
+            raise quota
+        except QuotaExhaustedError as exc:
+            raise RuntimeError("sleep cycle failed") from exc
+    except RuntimeError as wrapped:
+        assert quota_error(wrapped) is quota
+    assert quota_error(RuntimeError("other")) is None

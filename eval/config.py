@@ -45,5 +45,9 @@ class EvalSettings(BaseSettings):
     # 5,000 keeps one request under Groq's free 8K tokens/minute with room for the answer.
     full_context_tokens: int = 5_000
 
+    # nocturne sleeps after every N-th session (1 = between every pair of sessions, spec §9).
+    # LongMemEval-S has ~50 sessions per question: 5-10 keeps it within a daily quota.
+    sleep_every_sessions: int = 1
+
     cache_path: Path = ROOT / "eval" / ".cache" / "llm_cache.sqlite"
     results_dir: Path = ROOT / "eval" / "results"

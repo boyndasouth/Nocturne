@@ -39,6 +39,10 @@ class CycleOut(BaseModel):
     facts_created: int
     merges: int
     supersessions: int
+    links_created: int
+    themes_created: int
+    themes_updated: int
+    archived: int
     tokens_used: int
     llm_calls: int
     attempts: int

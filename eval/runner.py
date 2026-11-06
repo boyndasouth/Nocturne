@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import Settings
-from app.llm.client import LLMClient, OpenAICompatClient
+from app.llm.client import LLMClient, OpenAICompatClient, QuotaExhaustedError
 from app.llm.embeddings import Embedder, HashEmbedder, build_embedder
 from app.llm.providers import build_online_client, build_sleep_client
 from eval.base import CachedEmbedder, System
@@ -183,7 +183,15 @@ def build_systems(
             if name == "nocturne-no-sleep":
                 out.append(nocturne_no_sleep(**common))
             else:
-                out.append(NocturneSystem(name, sleep=True, sleep_llm=clients.sleep, **common))
+                out.append(
+                    NocturneSystem(
+                        name,
+                        sleep=True,
+                        sleep_llm=clients.sleep,
+                        sleep_every=es.sleep_every_sessions,
+                        **common,
+                    )
+                )
         else:
             raise ValueError(f"unknown system {name!r}; choose from {ALL_SYSTEMS}")
     return out
@@ -226,6 +234,7 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
         "judge_model": f"{clients.judge.name}:{clients.judge.model}",
         "embedding": "hash" if cfg.fake else f"{s.embedding_backend}:{s.embedding_model}",
         "full_context_tokens": es.full_context_tokens,
+        "sleep_every_sessions": es.sleep_every_sessions,
         "backend": {
             k: getattr(s, k)
             for k in (
@@ -251,6 +260,16 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
                 "conflict_sim",
                 "enable_dedup",
                 "enable_contradiction",
+                "enable_linker",
+                "link_sim",
+                "enable_abstractor",
+                "theme_sim",
+                "theme_min_facts",
+                "theme_match_overlap",
+                "theme_max_per_cycle",
+                "theme_batch_clusters",
+                "theme_facts_shown",
+                "theme_max_facts",
             )
         },
     }
@@ -312,6 +331,18 @@ def completed(run_dir: Path) -> set[tuple[str, str]]:
     return done
 
 
+def quota_error(exc: BaseException) -> QuotaExhaustedError | None:
+    """The daily-quota error behind `exc`, if any (sleep failures arrive wrapped)."""
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        if isinstance(cur, QuotaExhaustedError):
+            return cur
+        seen.add(id(cur))
+        cur = cur.__cause__ or cur.__context__
+    return None
+
+
 def _err(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {exc}"[:500]
 
@@ -344,6 +375,12 @@ async def run(
         nonlocal streak
         streak += 1
         log(f"  ! {what}: {_err(exc)}")
+        quota = quota_error(exc)
+        if quota is not None:
+            raise RunAborted(
+                f"{quota} Rows so far are saved; rerun the same command once it resets "
+                "(cached calls are free)."
+            ) from exc
         if streak >= max_errors:
             raise RunAborted(
                 f"{streak} failures in a row (last: {_err(exc)}). Rows so far are saved; "
@@ -395,6 +432,7 @@ async def run(
                         "facts_created": prep.facts_created,
                         "merges": prep.merges,
                         "supersessions": prep.supersessions,
+                        "links": prep.links,
                         "prep_seconds": round(prep.seconds, 2),
                         "sleep_tokens": sleep_used.tokens,
                         "sleep_calls": sleep_used.calls,

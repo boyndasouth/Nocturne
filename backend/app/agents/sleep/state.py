@@ -71,6 +71,37 @@ class Conflict(BaseModel):
     old_valid_from: datetime
 
 
+class Link(BaseModel):
+    """A typed link the Linker wants to add, src -> dst (refs)."""
+
+    src: str
+    dst: str
+    type: str  # a LinkType value
+
+
+class ClusterFact(BaseModel):
+    ref: str
+    content: str
+    valid_from: datetime
+
+
+class ThemePlan(BaseModel):
+    """A cluster the Abstractor will summarise: a new theme, or an update to `theme_id`."""
+
+    key: str
+    theme_id: UUID | None = None  # None: create a new theme
+    members: list[str]  # refs, in cluster order
+    facts: list[ClusterFact]  # what the LLM sees (capped)
+    valid_from: datetime  # earliest member's: the theme has been true since then
+    previous: str = ""  # current content of the theme being updated
+
+
+class ThemeText(BaseModel):
+    title: str
+    summary: str
+    keywords: list[str] = Field(default_factory=list)
+
+
 class SleepState(TypedDict, total=False):
     cycle_id: str
     clock: str  # ISO; the cycle's notion of "now" (simulated during benchmark replay)
@@ -84,6 +115,13 @@ class SleepState(TypedDict, total=False):
     conflict_groups: list[dict[str, Any]]
     conflict_cursor: int
     conflicts: list[dict[str, Any]]  # Conflict
+    link_groups: list[dict[str, Any]]  # Group, judged in chunks
+    link_cursor: int
+    links: list[dict[str, Any]]  # Link
+    theme_plans: list[dict[str, Any]]  # ThemePlan, summarised in chunks
+    theme_cursor: int
+    theme_texts: dict[str, dict[str, Any]]  # ThemePlan.key -> ThemeText
+    themes_retired: list[str]  # theme ids to archive
     tokens: int
     llm_calls: int
     result: dict[str, Any]
