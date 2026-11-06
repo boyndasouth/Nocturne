@@ -96,6 +96,8 @@ and the same Responder prompt, so the only difference between rows is the memory
 | `nocturne-no-sleep` | The real retriever (hybrid + §5 scoring + recent turns) over episodes |
 | `nocturne` | The same, after a sleep cycle at the end of every session |
 
+Judge: gpt-oss-20b with the official LongMemEval prompts; it agreed with hand labels on 20/20 sampled verdicts (two lenient calls on preference questions).
+
 ```powershell
 docker compose up -d                 # creates the nocturne_eval database (see docker-compose.yml)
 $env:EVAL_DATABASE_URL = "postgresql://nocturne:nocturne@localhost:5432/nocturne_eval"

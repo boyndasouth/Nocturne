@@ -1,0 +1,5 @@
+system,questions,accuracy,task_avg_accuracy,errors,retrieval_p50_ms,retrieval_p95_ms,answer_tokens,sleep_tokens,judge_tokens,mean_memory_items,mean_episodes,memory_ratio
+full-context,30,0.7,0.6786,0,,,121527,0,10680,7.2,10.6,0.676
+naive-rag,30,0.8667,0.8571,0,21.3,188.6,118844,0,9945,10.6,10.6,1.0
+nocturne,30,0.8667,0.8571,0,6.5,70.3,45419,300782,9599,19.3,10.6,1.818
+nocturne-no-sleep,30,0.8667,0.8571,0,7.3,68.0,47306,0,10263,10.6,10.6,1.0

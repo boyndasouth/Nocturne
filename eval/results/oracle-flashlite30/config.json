@@ -1,0 +1,58 @@
+{
+  "run": {
+    "dataset": "longmemeval-oracle",
+    "systems": [
+      "full-context",
+      "naive-rag",
+      "nocturne-no-sleep",
+      "nocturne"
+    ],
+    "run_name": "oracle-flashlite30",
+    "limit": 30,
+    "split": "all",
+    "categories": [],
+    "seed": 0,
+    "fake": false,
+    "max_errors": 3
+  },
+  "questions_selected": 30,
+  "fingerprint": {
+    "dataset": "longmemeval-oracle",
+    "split": "all",
+    "categories": [],
+    "seed": 0,
+    "fake": false,
+    "answer_model": "groq:openai/gpt-oss-120b",
+    "sleep_model": "gemini:gemini-3.5-flash-lite",
+    "judge_model": "judge-groq:openai/gpt-oss-20b",
+    "embedding": "fastembed:BAAI/bge-small-en-v1.5",
+    "full_context_tokens": 5000,
+    "backend": {
+      "retrieval_top_k": 8,
+      "retrieval_candidate_pool": 40,
+      "recent_turns": 4,
+      "score_alpha": 0.6,
+      "score_beta": 0.2,
+      "score_gamma": 0.1,
+      "score_delta": 0.1,
+      "recency_tau_days": 30.0,
+      "reinforce_eta": 0.2,
+      "online_max_tokens": 1500,
+      "online_reasoning_effort": "low",
+      "sleep_max_tokens": 8192,
+      "sleep_reasoning_effort": "",
+      "extract_batch_chars": 12000,
+      "extract_batch_episodes": 25,
+      "judge_batch_groups": 12,
+      "neighbors_k": 4,
+      "dedup_auto_sim": 0.97,
+      "dedup_judge_sim": 0.82,
+      "conflict_sim": 0.65,
+      "enable_dedup": true,
+      "enable_contradiction": true
+    }
+  },
+  "fingerprint_sha": "8d8a5587c74a",
+  "git_commit": "c3552fc-dirty",
+  "updated_at": "2026-11-06T03:52:35+00:00"
+}

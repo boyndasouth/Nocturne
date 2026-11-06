@@ -1,0 +1,70 @@
+system,question_id,category,question,gold,answer,correct,judge_raw,hand_verdict
+nocturne-no-sleep,1c0ddc50,single-session-preference,Can you suggest some activities I can do during my commute to work?,"The user would prefer suggestions related to listening to new podcasts or audiobooks, especially the genre beyond true crime or self-improvement, such as history. They may not be interested in activities that require visual attention, such as reading or watching videos, as they are commuting. The user would not prefer general podcast topics such as true crime or self-improvement, as the user wants to explore other topics.","Sure! Here are a few ideas you can try during your roughly 40‑minute each‑way commute. These don’t require any special equipment and can make the time feel more productive or enjoyable.
+
+### 1. **Micro‑learning**
+- **Language practice** – Use apps like Duolingo, Memrise, or a podcast in the language you’re learning. Short lessons fit nicely into a 40‑minute window.
+- **Skill snippets** – Listen to bite‑sized courses on platforms such as Coursera, LinkedIn Learning, or Skillshare. Topics range from coding basics to photography tips.
+
+### 2. **Audiobooks & Podcasts**
+- **Fiction** – Dive into a novel you’ve been meaning to read; many services (Audible, LibriVox) let you pick up where you left off.
+- **Non‑fiction** – Continue exploring history or science topics (e.g., *Hardcore History* episodes) or try something new like economics or philosophy.
+
+### 3. **Mindfulness & Mental Reset**
+- **Guided meditations** – Apps like Headspace or Insight Timer have short (5‑15 min) sessions that can calm the mind before work or unwind after a day.
+- **Breathing exercises** – Simple box breathing or the 4‑7‑8 technique can reduce stress and improve focus.
+
+### 4. **Creative Outlets**
+- **Idea journal** – Keep a small notebook or a notes app on your phone to jot down thoughts, story ideas, or project plans.
+- **Sketching** – If you’re not driving, a compact sketchpad or a drawing app can let you doodle or work on a quick illustration.
+
+### 5. **Physical Activity (if you’re not driving)**
+- **Standing or walking** – If you take public transit, stand on one leg for a minute, do calf raises, or stretch your neck and shoulders.
+- **Resistance bands** – Small bands can be used for discreet arm or leg exercises while seated.
+
+### 6. **Social Connection**
+- **Catch up** – Send a quick text or voice message to a friend or family member you haven’t spoken to in a while.
+- **Networking** – Listen to industry‑specific podcasts and note any contacts or ideas you might want to follow up on later.
+
+### 7. **Planning & Organization**
+- **Daily review** – Use a planner or digital task manager (Todoist, Notion) to review tomorrow’s priorities and set three main goals.
+- **Budget check** – Review your finances, update a budgeting app, or read a short personal‑finance article.
+
+### 8. **Games & Puzzles**
+- **Word games** – Crossword apps, Wordle, or a quick Sudoku can keep your brain active.
+- **Trivia quizzes** – Apps like Trivia Crack let you answer a few questions in short bursts.
+
+Mix and match these activities depending on your mood and whether you’re on a train, bus, or driving (in which case stick to audio‑only options). Over time you’ll discover which combos make the commute feel both enjoyable and productive. Safe travels!",TRUE,yes,TRUE
+naive-rag,35a27287,single-session-preference,Can you recommend some interesting cultural events happening around me this weekend?,"The user would prefer responses that suggest cultural events where they can practice their language skills, particularly Spanish and French. They would also appreciate if the event has a focus on language learning resources. They would not prefer events that do not provide opportunities for language practice or cultural exchange.","I’m sorry, but I don’t have any information in my memory about specific cultural events happening near you this weekend. If you let me know your city or region, I can suggest ways to find local events.",FALSE,no,FALSE
+nocturne-no-sleep,71315a70,knowledge-update,How many hours have I spent on my abstract ocean sculpture?,10-12 hours,You’ve logged about 10–12 hours on your abstract ocean sculpture so far【M1】.,TRUE,yes,TRUE
+nocturne-no-sleep,6b168ec8,single-session-user,How many bikes do I own?,three,"You have three bikes – a road bike, a mountain bike, and a commuter bike [M1].",TRUE,yes,TRUE
+naive-rag,6b168ec8,single-session-user,How many bikes do I own?,three,"You have three bikes – a road bike, a mountain bike, and a commuter bike [M1].",TRUE,yes,TRUE
+full-context,06db6396,knowledge-update,How many projects have I completed since starting painting classes?,5,You’ve completed five projects since you began your painting classes [M7].,TRUE,yes,TRUE
+naive-rag,bc8a6e93_abs,abstention,What did I bake for my uncle's birthday party?,You did not mention this information. You mentioned baking for your niece's birthday party but not your uncle's,I don’t have a record of what you baked for your uncle’s birthday party in the stored memories.,TRUE,yes,TRUE
+nocturne,06db6396,knowledge-update,How many projects have I completed since starting painting classes?,5,You’ve completed **5 painting projects** since you started your classes [M1].,TRUE,yes,TRUE
+nocturne,88432d0a_abs,abstention,How many times did I bake egg tarts in the past two weeks?,The information provided is not enough. You did not mention baking egg tarts.,I don’t have any record of you baking egg tarts in the past two weeks in the stored memories.,TRUE,yes,TRUE
+naive-rag,caf03d32,single-session-preference,I've been struggling with my slow cooker recipes. Any advice on getting better results?,"The user would prefer responses that provide tips and advice specifically tailored to their slow cooker experiences, utilizing their recent success with beef stew and interest in making yogurt in the slow cooker. They might not prefer general slow cooker recipes or advice unrelated to their specific experiences and interests.","Here are a few practical tips that usually make a big difference with slow‑cooker cooking:
+
+| Area | What to try |
+|------|--------------|
+| **Heat setting** | Most slow cookers have “low,” “high,” and sometimes a “keep warm” mode. For most dishes, low (≈ 190 °F/88 °C) gives a gentler, more even cook and helps prevent proteins from drying out. Use high only when you’re short on time or when a recipe specifically calls for it. |
+| **Layering ingredients** | Place the denser, tougher items (root vegetables, meat with bone) on the bottom where the heat is strongest. Put more delicate veggies or quick‑cooking grains on top. This prevents the softer ingredients from turning mushy. |
+| **Don’t over‑fill** | Fill the pot no more than two‑thirds full. Too much volume can trap steam and raise the internal temperature, leading to over‑cooked or watery results. |
+| **Moisture balance** | Slow cookers retain a lot of liquid. If a recipe calls for a cup of broth, you can usually cut it by about ¼ – ⅓ to avoid a soupy final dish. Add a splash of water or broth only if the mixture looks dry. |
+| **Seasoning** | Salt can become muted during long cooking. Taste and adjust seasoning (salt, herbs, spices) in the last 30 minutes of cooking, or add fresh herbs right before serving for a brighter flavor. |
+| **Avoid opening the lid** | Every time you lift the lid, you lose about 15‑20 °F of heat and add 10‑15 minutes of cooking time. Trust the timer and only check near the end. |
+| **Pre‑brown meat** | Browning meat in a skillet before adding it to the slow cooker adds flavor (Maillard reaction) and helps render excess fat, which can otherwise make the dish greasy. |
+| **Use the right size** | A 4‑quart cooker is ideal for most family‑size meals. Larger units can leave food too spread out, resulting in uneven cooking. |
+| **Timing for beans & grains** | Dried beans need a soak or a quick‑soak (boil 5 min, then let sit 1 hour) before adding, otherwise they may stay hard. For quick‑cooking grains (quinoa, rice), add them in the last 30‑45 minutes so they don’t turn to mush. |
+| **Finish with a thickener** | If the sauce is thinner than you’d like, stir in a slurry of cornstarch + cold water (1 tbsp cornstarch per cup liquid) during the last 15 minutes, then let it cook uncovered for a few minutes to activate the thickening. |
+
+These adjustments work for both savory dishes (like the chili, pulled pork, or beef stew you mentioned in [M1]) and for more delicate projects such as slow‑cooker yogurt ([M3]). Try tweaking one or two variables at a time so you can see which change makes the biggest improvement for your specific recipes. Happy cooking!",TRUE,yes,TRUE
+nocturne-no-sleep,gpt4_af6db32f,temporal-reasoning,How many days ago did I watch the Super Bowl?,17 days ago. 18 days (including the last day) is also acceptable.,"The Super Bowl you mentioned was on 2023‑02‑12 (the date of the conversation where you talked about winning $20 after the game) 【M1】. From the current date 2023‑03‑01, that was **17 days ago**.",TRUE,yes,TRUE
+nocturne-no-sleep,10d9b85a,multi-session,"How many days did I spend attending workshops, lectures, and conferences in April?",3 days,"You attended a lecture on April 10 (1 day) [M1] and a two‑day workshop on April 17 and 18 (2 days) [M4]. Adding those together, you spent **3 days** in April attending workshops, lectures, or conferences.",TRUE,yes,TRUE
+nocturne-no-sleep,65240037,single-session-assistant,I remember you told me to dilute tea tree oil with a carrier oil before applying it to my skin. Can you remind me what the recommended ratio is?,"The recommended ratio is 1:10, meaning one part tea tree oil to ten parts carrier oil.",Sure! I recommended diluting tea tree oil with a carrier oil at roughly **one part tea‑tree oil to ten parts carrier oil** (a 1:10 ratio) before applying it to the skin【M2】. This helps prevent irritation while still letting the oil’s benefits work.,TRUE,yes,TRUE
+naive-rag,dfde3500,knowledge-update,What day of the week did I meet with my previous language exchange tutor Juan?,Wednesday,Your language‑exchange class with Juan meets on **Wednesday evening**【M2】.,TRUE,yes,TRUE
+nocturne,2133c1b5_abs,abstention,How long have I been living in my current apartment in Shinjuku?,The information provided is not enough. You mentioned living in Harajuku but not Shinjuku.,"I don’t have any memory about a current apartment in Shinjuku, so I can’t tell how long you’ve been living there.",TRUE,yes,TRUE
+naive-rag,4c36ccef,single-session-assistant,Can you remind me of the name of the romantic Italian restaurant in Rome you recommended for dinner?,Roscioli,The romantic Italian restaurant I suggested for dinner was **Roscioli**【M2】.,TRUE,yes,TRUE
+nocturne,3e321797,single-session-assistant,"I wanted to follow up on our previous conversation about natural remedies for dark circles under the eyes. You mentioned applying tomato juice mixed with lemon juice, how long did you say I should leave it on for?",10 minutes,You should leave the tomato‑lemon mixture on your under‑eye area for about **10 minutes** before rinsing it off with cool water【M1】.,TRUE,yes,TRUE
+nocturne-no-sleep,6f9b354f,single-session-user,What color did I repaint my bedroom walls?,a lighter shade of gray,You repainted your bedroom walls a lighter shade of gray [M1].,TRUE,yes,TRUE
+nocturne-no-sleep,gpt4_213fd887,temporal-reasoning,"Which event did I participate in first, the volleyball league or the charity 5K run to raise money for a local children's hospital?",volleyball league,"I don’t have any record of either event in my memory, so I can’t tell which one you participated in first.",FALSE,no,FALSE
+full-context,gpt4_af6db32f,temporal-reasoning,How many days ago did I watch the Super Bowl?,17 days ago. 18 days (including the last day) is also acceptable.,"You watched the Super Bowl on 2023‑02‑12, which is 17 days before the current date of 2023‑03‑01 UTC【M1】.",TRUE,yes,TRUE
