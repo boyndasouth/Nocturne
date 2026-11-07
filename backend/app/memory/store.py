@@ -269,9 +269,18 @@ class MemoryStore:
             rows = await cur.fetchall()
         return [_candidate(r) for r in rows]
 
-    async def reinforce(self, note_ids: Sequence[UUID], *, now: datetime, eta: float) -> None:
-        """Access reinforcement (spec §3.1). Access metadata isn't a content edit, so
-        `version` isn't bumped and no memory_versions snapshot is written."""
+    async def reinforce(
+        self,
+        note_ids: Sequence[UUID],
+        *,
+        now: datetime,
+        eta: float,
+        kappa: float = 1.5,
+        max_tau_days: float = 365.0,
+    ) -> None:
+        """Access reinforcement (spec §3.1, §5): strength_0 moves towards 1 and τ grows by κ
+        (spacing effect), capped. Access metadata isn't a content edit, so `version` isn't
+        bumped and no memory_versions snapshot is written."""
         ids = list(dict.fromkeys(note_ids))
         if not ids:
             return
@@ -283,8 +292,12 @@ class MemoryStore:
             async with conn.cursor() as c:
                 await c.executemany(
                     "update memory_notes set strength = %s, access_count = access_count + 1,"
-                    " last_accessed = greatest(coalesce(last_accessed, %s), %s) where id = %s",
-                    [(reinforce(r["strength"], eta), now, now, r["id"]) for r in rows],
+                    " last_accessed = greatest(coalesce(last_accessed, %s), %s),"
+                    " decay_tau_days = least(%s, decay_tau_days * %s) where id = %s",
+                    [
+                        (reinforce(r["strength"], eta), now, now, max_tau_days, kappa, r["id"])
+                        for r in rows
+                    ],
                 )
 
     # --- Versioned edits (spec §3.2 design rule, §4.3) ----------------------------------------
@@ -342,6 +355,35 @@ class MemoryStore:
             """,
             (cycle_id, reason, note_id),
         )
+
+    async def archive_notes_tx(
+        self,
+        conn: psycopg.AsyncConnection,
+        note_ids: Sequence[UUID],
+        *,
+        cycle_id: UUID | None,
+        reason: str,
+    ) -> int:
+        """Batch form of edit_note(status=archived): snapshot every row, then archive it.
+        Only active notes are touched; returns how many were archived."""
+        ids = list(dict.fromkeys(note_ids))
+        if not ids:
+            return 0
+        await conn.execute(
+            """
+            insert into memory_versions
+                (note_id, version, content, snapshot, changed_by_cycle, reason)
+            select id, version, content, to_jsonb(n) - 'search_tsv', %s, %s
+            from memory_notes n where id = any(%s) and status = 'active'
+            """,
+            (cycle_id, reason, ids),
+        )
+        cur = await conn.execute(
+            "update memory_notes set status = 'archived', version = version + 1"
+            " where id = any(%s) and status = 'active'",
+            (ids,),
+        )
+        return cur.rowcount
 
     async def merge_evidence_tx(
         self,

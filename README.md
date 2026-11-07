@@ -3,12 +3,13 @@
 A long-term memory agent. A fast online agent answers questions; an offline "sleep" agent
 consolidates, links, corrects, and prunes memories between sessions.
 
-**Status: Phase 3, step 3 of 4 (hierarchical retriever).** A checkpointed LangGraph sleep
+**Status: Phase 3 complete (structure and forgetting).** A checkpointed LangGraph sleep
 cycle extracts facts, merges duplicates, supersedes contradicted facts with bitemporal
-history, links related facts and summarises clusters of facts into themes. Retrieval walks
-that structure: themes, their facts, one hop of links, and what was true at the time a
-question asks about. A benchmark harness compares it against baselines. Next: forgetting
-and the Auditor.
+history, links related facts, summarises clusters into themes, forgets what has decayed,
+and has an LLM auditor spot-check its own decisions. Retrieval walks that structure:
+themes, their facts, one hop of links, and what was true at the time a question asks
+about. A benchmark harness compares it against baselines. Next: Phase 4 (full evaluation,
+UI, deploy).
 
 ## What works now
 
@@ -21,7 +22,9 @@ and the Auditor.
 | Hierarchical retrieval: themes → member facts → one link hop, archived-episode fallback, score inheritance | `backend/app/memory/retriever.py` |
 | Time phrases ("in March", "last week", "2 months ago", "before May") → a window that brings back superseded facts true then | `backend/app/memory/temporal.py` |
 | `POST /chat`, `POST /ingest`, `GET /health` | `backend/app/api/` |
-| Sleep graph: Extractor → Deduplicator → Contradiction Resolver → Linker → Abstractor → Apply (LangGraph, Postgres checkpoints) | `backend/app/agents/sleep/` |
+| Sleep graph: Extractor → Deduplicator → Contradiction Resolver → Linker → Abstractor → Apply (+ Forgetter) → Auditor (LangGraph, Postgres checkpoints) | `backend/app/agents/sleep/` |
+| Forgetter: §5 forgetting curve with per-note τ that grows on access; archives consolidated turns and unused facts, versioned and recoverable | `backend/app/agents/sleep/forgetter.py`, `migrations/004_forgetter_auditor.sql` |
+| Auditor: LLM judge on a stratified sample of each cycle's merges, supersessions, links and themes | `backend/app/agents/sleep/auditor.py` |
 | Linker: typed fact-to-fact links (`related`, `elaborates`, `example_of`, `caused_by`), batched LLM labelling | `backend/app/agents/sleep/linker.py` |
 | Abstractor: average-linkage clustering (numpy) → `theme` notes that track their members across cycles | `backend/app/agents/sleep/abstractor.py`, `cluster.py`, `migrations/003_links_themes.sql` |
 | Versioned edits: full-row JSON snapshot before every change; `supersedes` links; valid time vs. transaction time | `backend/app/memory/store.py`, `migrations/002_sleep_cycle.sql` |
@@ -116,7 +119,9 @@ python eval/run_eval.py --limit 30 --report-only --sample 20   # CSVs + 20 verdi
 Results land in `eval/results/<run>/`: `summary.csv` (accuracy per system × category),
 `totals.csv` (overall and task-averaged accuracy, retrieval p50/p95, tokens online vs.
 offline, memory items per episode), `results.csv` (every answer with its verdict), and
-`conversations.csv` (memory size and sleep work per conversation).
+`conversations.csv` (memory size, sleep work, archived notes and the Auditor's score per
+conversation). `totals.csv` reports `memory_ratio` (active memory items per raw turn; below
+1 means the store is smaller than the log) and the mean `audit_score`.
 
 - **Resumable.** Rows are appended as they finish. Rerun the same command after a rate limit
   or Ctrl-C and it picks up where it stopped; every LLM call is cached in `eval/.cache/`, so
@@ -211,6 +216,18 @@ CI (`.github/workflows/ci.yml`) runs everything against a pgvector service conta
   cost an LLM call; updates are versioned like any other edit. A theme is archived only once
   fewer than `THEME_MIN_FACTS` of its facts are still active. Themes link to members with
   `summarizes`.
+- **Forgetting is conservative.** Strength decays as `strength₀·e^(−days/τ)` from the last
+  access (or from when it was recorded), and every access grows τ by κ = 1.5. A turn that's
+  been consolidated into facts is archived after about one τ untouched (~30 days); a fact
+  after about five (~150 days), and only if it was used at most once and isn't part of an
+  active theme. Themes, superseded facts and unconsolidated turns are never forgotten.
+  Archiving is a versioned status change, and retrieval's fallback still searches archived
+  turns and facts, so forgetting removes clutter without making anything unrecoverable.
+  It runs inside the apply transaction, after this cycle's themes are written.
+- **The Auditor observes, never edits.** After the commit, up to `AUDIT_SAMPLE` decisions
+  (round-robin across kinds, seeded by the cycle id) are rated good / questionable / wrong
+  in one call. The mean and every verdict land on the cycle row (`audit_score`, `audit`) and
+  in the trace. An audit that fails (a quota, bad JSON) is recorded and can't fail the cycle.
 - **Daily quotas fail fast.** A per-day 429 raises `QuotaExhaustedError` instead of retrying,
   so a cycle fails and backs off rather than hammering an exhausted quota.
 - **One cycle at a time, across processes.** A partial unique index allows a single `running`

@@ -147,6 +147,21 @@ Respond with only a JSON object:
 {"themes": [{"cluster": int, "title": str | null, "summary": str, "keywords": [str]}]}
 Include every cluster exactly once."""
 
+AUDITOR_SYSTEM = """\
+You review decisions an automated memory system made while consolidating notes about a \
+user. Judge each decision only from the text shown:
+- MERGE: two statements were treated as the same fact. Good if they say the same thing.
+- SUPERSEDE: a newer fact replaced an older one. Good if the two genuinely conflict and \
+the newer one is the current truth; wrong if both can be true at once.
+- LINK: "A <type> B". Good if the relation holds as stated (direction matters).
+- THEME: a summary of a group of facts. Good if it is faithful to the facts and they \
+share a real subject; wrong if it states something the facts don't say.
+Verdicts: "good", "questionable" (defensible but doubtful), or "wrong".
+
+Respond with only a JSON object:
+{"verdicts": [{"item": int, "verdict": str, "note": str}]}
+Include every item exactly once; keep each note under 20 words."""
+
 CLUSTER_TEMPLATE = """\
 Cluster {n}
 {facts}"""

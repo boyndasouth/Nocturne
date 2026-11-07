@@ -55,7 +55,10 @@ class EvalDatabase:
             cur = await conn.execute(
                 "select count(*) as n, coalesce(sum(facts_created), 0) as facts,"
                 " coalesce(sum(merges), 0) as merges,"
-                " coalesce(sum(supersessions), 0) as sups"
+                " coalesce(sum(supersessions), 0) as sups,"
+                " coalesce(sum(archived), 0) as archived,"
+                " sum(audit_score * audit_items) / nullif(sum(audit_items), 0) as audit,"
+                " coalesce(sum(audit_items), 0) as audit_items"
                 " from sleep_cycles where status = 'succeeded'"
             )
             cyc = await cur.fetchone()
@@ -75,4 +78,7 @@ class EvalDatabase:
             merges=int(cyc["merges"]),
             supersessions=int(cyc["sups"]),
             links=int(links["n"]),
+            archived=int(cyc["archived"]),
+            audit_score=None if cyc["audit"] is None else round(float(cyc["audit"]), 4),
+            audit_items=int(cyc["audit_items"]),
         )

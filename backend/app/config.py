@@ -81,6 +81,16 @@ class Settings(BaseSettings):
     score_delta: float = 0.1
     recency_tau_days: float = 30.0
     reinforce_eta: float = 0.2
+    reinforce_kappa: float = 1.5  # τ grows by this on every access (spacing effect)
+    # Forgetter (spec §3.2 step 6). Notes start at τ = 30 days; untouched, a consolidated
+    # episode is archived after ~1 τ, an unused fact outside any theme after ~5 τ.
+    enable_forgetter: bool = True
+    forget_episode_theta: float = 0.37
+    forget_fact_theta: float = 0.0067
+    forget_max_access: int = 1
+    # Auditor (step 7): an LLM judge spot-checks this many of each cycle's decisions.
+    enable_auditor: bool = True
+    audit_sample: int = 8
 
     # --- Sleep cycle (spec §3.2) -------------------------------------------------------------
     sleep_auto: bool = True  # in-process idle/backlog trigger

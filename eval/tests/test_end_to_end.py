@@ -75,6 +75,7 @@ def test_fake_run_produces_results_for_every_system_and_resumes(eval_env):
     slept = convs[("nocturne", "ku_001")]
     assert int(slept["sleep_cycles"]) == 2  # one per session
     assert int(slept["memory_fact"]) > 0 and int(slept["sleep_tokens"]) > 0
+    assert slept["audit_score"] == ""  # nothing merged, linked or themed: nothing to audit
     awake = convs[("nocturne-no-sleep", "ku_001")]
     assert (awake["memory_fact"], awake["sleep_tokens"]) == ("0", "0")
 
@@ -127,3 +128,4 @@ def test_linker_and_abstractor_run_in_the_eval(eval_env, monkeypatch):
     ku = convs["ku_001"]  # 2 sessions, 3 user turns
     assert ku["sleep_cycles"] == "1"  # every 2 sessions -> one cycle
     assert int(ku["links"]) > 0 and int(ku["memory_theme"]) > 0
+    assert float(ku["audit_score"]) == 1.0 and int(ku["audit_items"]) > 0  # fake judge: "good"

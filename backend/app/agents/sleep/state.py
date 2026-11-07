@@ -122,6 +122,7 @@ class SleepState(TypedDict, total=False):
     theme_cursor: int
     theme_texts: dict[str, dict[str, Any]]  # ThemePlan.key -> ThemeText
     themes_retired: list[str]  # theme ids to archive
+    audit: dict[str, Any]  # Auditor summary (score, by kind), after the commit
     tokens: int
     llm_calls: int
     result: dict[str, Any]

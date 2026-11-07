@@ -57,6 +57,15 @@ _DAILY_QUOTA_RE = re.compile(r"per[\s_-]?day|\((?:TPD|RPD)\)", re.IGNORECASE)
 _QUOTA_FIELD_RE = re.compile(r'"(quotaId|quotaValue)"\s*:\s*"([^"]+)"')
 
 
+def _reset_hint(provider: str) -> str:
+    p = provider.lower()
+    if "gemini" in p:
+        return "Gemini resets daily quotas at midnight Pacific time."
+    if "groq" in p:
+        return "Groq's limit is a rolling 24 hours: capacity returns gradually over the day."
+    return "Wait for the quota to reset."
+
+
 def daily_quota_detail(body: str) -> str | None:
     """None unless `body` (a 429 response) is about a per-day limit; otherwise a short
     description, with Gemini's quota id and value when present."""
@@ -240,8 +249,8 @@ class OpenAICompatClient:
 
         if r.status_code == 429 and (detail := daily_quota_detail(r.text)):
             raise QuotaExhaustedError(
-                f"{self.name}: daily quota used up for {self.model} ({detail}). Wait for it to "
-                "reset (Gemini: midnight Pacific time) or switch to a model with its own quota."
+                f"{self.name}: daily quota used up for {self.model} ({detail}). "
+                f"{_reset_hint(self.name)} Or switch to a model with its own quota."
             )
         if r.status_code in RETRYABLE_STATUS:
             raise RetryableLLMError(

@@ -115,7 +115,7 @@ def plan(
         cycles = sum(len(sleep_points(c.session_ends(), sleep_every)) for c in conversations)
         lines.append(
             f"sleep cycles: {cycles} (every {sleep_every} session(s))   sleep calls: >= {cycles}"
-            " (up to ~4x with dedup, conflict, link and theme judging)"
+            " (up to ~5x with dedup, conflict, link, theme and audit calls)"
         )
     return "\n".join(lines)
 

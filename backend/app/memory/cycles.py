@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID
 
 import psycopg
+from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel
 
@@ -35,6 +36,8 @@ class SleepCycle(BaseModel):
     links_created: int = 0
     themes_created: int = 0
     themes_updated: int = 0
+    audit_score: float | None = None
+    audit_items: int = 0
     tokens_used: int
     llm_calls: int
     attempts: int
@@ -45,7 +48,8 @@ class SleepCycle(BaseModel):
 _COLS = (
     "cycle_id, started_at, finished_at, status::text as status, clock, episode_ids,"
     " episodes_processed, facts_created, merges, supersessions, archived, links_created,"
-    " themes_created, themes_updated, tokens_used, llm_calls, attempts, heartbeat_at, error"
+    " themes_created, themes_updated, tokens_used, llm_calls, attempts, heartbeat_at, error,"
+    " audit_score, audit_items"
 )
 
 
@@ -129,6 +133,25 @@ class CycleStore:
                 "update sleep_cycles set status = 'failed', error = %s, finished_at = now()"
                 " where cycle_id = %s and status = 'running'",
                 (error[:2000], cycle_id),
+            )
+
+    async def record_audit(
+        self,
+        cycle_id: UUID,
+        *,
+        score: float | None,
+        items: int,
+        detail: dict[str, Any],
+        tokens: int = 0,
+        llm_calls: int = 0,
+    ) -> None:
+        """The Auditor's result, after the cycle committed. Its tokens count toward the cycle."""
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                "update sleep_cycles set audit_score = %s, audit_items = %s, audit = %s,"
+                " tokens_used = tokens_used + %s, llm_calls = llm_calls + %s"
+                " where cycle_id = %s",
+                (score, items, Jsonb(detail), tokens, llm_calls, cycle_id),
             )
 
     async def finish_tx(

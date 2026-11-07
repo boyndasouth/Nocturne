@@ -25,6 +25,9 @@ class PrepStats:
     merges: int = 0
     supersessions: int = 0
     links: int = 0  # Linker links between facts (not supersedes / theme membership)
+    archived: int = 0  # notes the Forgetter (and Abstractor) archived
+    audit_score: float | None = None  # mean Auditor score over this memory's cycles
+    audit_items: int = 0
     seconds: float = 0.0
 
 

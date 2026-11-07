@@ -60,6 +60,9 @@ CONVERSATION_FIELDS = (
     "merges",
     "supersessions",
     "links",
+    "archived",
+    "audit_score",
+    "audit_items",
     "prep_seconds",
     "sleep_tokens",
     "sleep_calls",
@@ -83,6 +86,7 @@ TOTALS_FIELDS = (
     "mean_memory_items",
     "mean_episodes",
     "memory_ratio",
+    "audit_score",
 )
 
 
@@ -172,9 +176,21 @@ def summarize(
                 # Memory items per episode ingested: < 1 means the store is more compact
                 # than the raw log (goal 4: sub-linear growth).
                 "memory_ratio": round(items / episodes, 3) if episodes else None,
+                # Auditor quality (spec §9), weighted by how many verdicts each memory got.
+                "audit_score": _weighted_audit(convs),
             }
         )
     return summary, totals
+
+
+def _weighted_audit(convs: Sequence[dict[str, Any]]) -> float | None:
+    pairs = [
+        (float(c["audit_score"]), int(c.get("audit_items") or 0))
+        for c in convs
+        if c.get("audit_score") not in (None, "")
+    ]
+    n = sum(w for _, w in pairs)
+    return round(sum(s * w for s, w in pairs) / n, 4) if n else None
 
 
 def _round(x: float | None) -> float | None:

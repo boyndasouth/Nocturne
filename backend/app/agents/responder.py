@@ -129,6 +129,7 @@ class Responder:
         tracer: Tracer | None = None,
         recent_turns: int = 4,
         reinforce_eta: float = 0.2,
+        reinforce_kappa: float = 1.5,
         max_tokens: int = 800,
     ) -> None:
         self._llm = llm
@@ -138,6 +139,7 @@ class Responder:
         self._tracer = tracer or Tracer()
         self._recent_turns = recent_turns
         self._eta = reinforce_eta
+        self._kappa = reinforce_kappa
         self._max_tokens = max_tokens
 
     async def respond(
@@ -181,7 +183,9 @@ class Responder:
             citations = extract_citations(resp.text, refmap)
             episode_id: UUID | None = None
             if remember:
-                await self._store.reinforce([c.note_id for c in citations], now=now, eta=self._eta)
+                await self._store.reinforce(
+                    [c.note_id for c in citations], now=now, eta=self._eta, kappa=self._kappa
+                )
                 episode = await self._writer.write_turn(message, resp.text, occurred_at=now)
                 episode_id = episode.id
 

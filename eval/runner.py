@@ -277,6 +277,13 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
                 "theme_batch_clusters",
                 "theme_facts_shown",
                 "theme_max_facts",
+                "reinforce_kappa",
+                "enable_forgetter",
+                "forget_episode_theta",
+                "forget_fact_theta",
+                "forget_max_access",
+                "enable_auditor",
+                "audit_sample",
             )
         },
     }
@@ -440,6 +447,9 @@ async def run(
                         "merges": prep.merges,
                         "supersessions": prep.supersessions,
                         "links": prep.links,
+                        "archived": prep.archived,
+                        "audit_score": prep.audit_score,
+                        "audit_items": prep.audit_items,
                         "prep_seconds": round(prep.seconds, 2),
                         "sleep_tokens": sleep_used.tokens,
                         "sleep_calls": sleep_used.calls,

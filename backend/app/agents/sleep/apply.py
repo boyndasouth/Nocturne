@@ -3,8 +3,8 @@
 `plan_apply` is pure: it resolves duplicate chains, folds evidence into canonical facts, and
 orders supersessions by valid time. `apply_plan` then writes everything in ONE transaction:
 facts, merges, supersessions, the Linker's links, the Abstractor's themes, the episodes
-marked consolidated and the cycle marked succeeded. A cycle either fully happens or not at
-all, and a resumed cycle can never double-apply.
+marked consolidated, the Forgetter's archiving, and the cycle marked succeeded. A cycle
+either fully happens or not at all, and a resumed cycle can never double-apply.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from uuid import UUID
 
 from app.agents.sleep.abstractor import theme_content
 from app.agents.sleep.contradiction import Supersession, Timed, resolve
+from app.agents.sleep.forgetter import ForgetConfig, select_forgettable
 from app.agents.sleep.state import (
     Conflict,
     FactCandidate,
@@ -168,6 +169,8 @@ class ApplyResult:
     themes_created: int = 0
     themes_updated: int = 0
     themes_archived: int = 0
+    episodes_archived: int = 0
+    facts_archived: int = 0
 
 
 async def apply_plan(
@@ -184,8 +187,10 @@ async def apply_plan(
     tokens_used: int,
     llm_calls: int,
     structure: StructurePlan | None = None,
+    forget: ForgetConfig | None = None,
 ) -> ApplyResult:
     structure = structure or StructurePlan()
+    archived_counts = {"episode": 0, "fact": 0}
     vectors = await aembed_documents(embedder, [p.content for p in plan.inserts])
     theme_texts = [theme_content(text) for _, text in structure.themes]
     theme_vectors = await aembed_documents(embedder, theme_texts)
@@ -286,6 +291,19 @@ async def apply_plan(
             )
 
         await store.mark_consolidated(conn, episode_ids, cycle_id)
+
+        # Forgetter: last, so this cycle's facts and theme memberships already count.
+        forgotten = await select_forgettable(conn, clock=clock, cfg=forget or ForgetConfig(False))
+        for tier in ("episode", "fact"):
+            ids_ = [i for i, t in forgotten if t == tier]
+            archived_counts[tier] = await store.archive_notes_tx(
+                conn,
+                ids_,
+                cycle_id=cycle_id,
+                reason=f"forgotten: decayed {tier}"
+                + (" (consolidated into facts)" if tier == "episode" else ""),
+            )
+
         await cycles.finish_tx(
             conn,
             cycle_id,
@@ -298,7 +316,7 @@ async def apply_plan(
             links_created=links_created,
             themes_created=themes_created,
             themes_updated=themes_updated,
-            archived=len(structure.retired_themes),
+            archived=len(structure.retired_themes) + sum(archived_counts.values()),
         )
     return ApplyResult(
         facts_created=len(inserted),
@@ -309,4 +327,6 @@ async def apply_plan(
         themes_created=themes_created,
         themes_updated=themes_updated,
         themes_archived=len(structure.retired_themes),
+        episodes_archived=archived_counts["episode"],
+        facts_archived=archived_counts["fact"],
     )

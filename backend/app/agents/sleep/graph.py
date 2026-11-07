@@ -1,7 +1,7 @@
 """The sleep graph (spec §3.2), built with LangGraph.
 
     extract ⟲ ─► dedup_prepare ─► dedup_judge ⟲ ─► conflict_prepare ─► conflict_judge ⟲
-      ─► link_prepare ─► link_judge ⟲ ─► theme_prepare ─► theme_judge ⟲ ─► apply
+      ─► link_prepare ─► link_judge ⟲ ─► theme_prepare ─► theme_judge ⟲ ─► apply ─► audit
 
 ⟲ = one LLM batch per step. LangGraph checkpoints after every step, so a cycle that fails
 on a rate limit resumes at the batch that failed instead of re-spending quota on the ones that
@@ -11,11 +11,14 @@ The Linker and Abstractor plan against the memory as it *will* be once this cycl
 (new facts in, superseded ones out), which `plan_apply` can compute before anything is
 written. That's what lets their output join the same transaction.
 
-Phase 3 step 4 adds the Forgetter and Auditor.
+The Forgetter has no LLM step: it runs inside `apply`, last, so it sees this cycle's facts
+and theme memberships. The Auditor runs after the commit: it only reads, and its failures
+are recorded, never raised, so it can't undo or fail a cycle that already succeeded.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -31,11 +34,14 @@ from app.agents.sleep.abstractor import (
     ExistingTheme,
     plan_themes,
     summarise_clusters,
+    theme_content,
 )
 from app.agents.sleep.apply import ApplyPlan, StructurePlan, apply_plan, plan_apply
+from app.agents.sleep.auditor import AuditItem, audit, sample_items
 from app.agents.sleep.contradiction import judge_conflicts
 from app.agents.sleep.dedup import DedupThresholds, judge_duplicates, plan_dedup
 from app.agents.sleep.extractor import batch_episodes, extract_batch
+from app.agents.sleep.forgetter import ForgetConfig
 from app.agents.sleep.judge import chunks, cosine_matrix, neighbor_lists
 from app.agents.sleep.linker import judge_links
 from app.agents.sleep.state import (
@@ -60,6 +66,8 @@ from app.llm.tracing import Tracer
 from app.memory.cycles import CycleStore
 from app.memory.store import MemoryStore
 
+log = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class SleepConfig:
@@ -77,6 +85,9 @@ class SleepConfig:
     abstract: AbstractConfig = AbstractConfig()
     theme_batch_clusters: int = 6
     theme_max_facts: int = 2000
+    forget: ForgetConfig = ForgetConfig()
+    enable_auditor: bool = True
+    audit_sample: int = 8
     max_tokens: int = 8192
     reinforce_eta: float = 0.2
 
@@ -103,6 +114,14 @@ class SleepConfig:
             ),
             theme_batch_clusters=s.theme_batch_clusters,
             theme_max_facts=s.theme_max_facts,
+            forget=ForgetConfig(
+                enabled=s.enable_forgetter,
+                episode_theta=s.forget_episode_theta,
+                fact_theta=s.forget_fact_theta,
+                max_access=s.forget_max_access,
+            ),
+            enable_auditor=s.enable_auditor,
+            audit_sample=s.audit_sample,
             max_tokens=s.sleep_max_tokens,
             reinforce_eta=s.reinforce_eta,
         )
@@ -415,6 +434,7 @@ def build_sleep_graph(
             tokens_used=state.get("tokens", 0),
             llm_calls=state.get("llm_calls", 0),
             structure=structure,
+            forget=cfg.forget,
         )
         return {
             "result": {
@@ -425,8 +445,102 @@ def build_sleep_graph(
                 "themes_created": result.themes_created,
                 "themes_updated": result.themes_updated,
                 "themes_archived": result.themes_archived,
+                "episodes_archived": result.episodes_archived,
+                "facts_archived": result.facts_archived,
             }
         }
+
+    # --- 7. Auditor (after the commit; observe only) ------------------------------------------
+
+    async def audit_node(state: SleepState) -> dict[str, Any]:
+        if not cfg.enable_auditor or cfg.audit_sample <= 0:
+            return {}
+        cycle_id = UUID(state["cycle_id"])
+        try:
+            items = await _audit_items(state)
+            picked = sample_items(items, n=cfg.audit_sample, seed=str(cycle_id))
+            if not picked:
+                return {}
+            result, usage = await audit(deps.llm, picked, max_tokens=cfg.max_tokens)
+            await deps.cycles.record_audit(
+                cycle_id,
+                score=result.score,
+                items=len(result.verdicts),
+                detail={"by_kind": result.by_kind(), "verdicts": result.verdicts},
+                tokens=usage.tokens,
+                llm_calls=usage.calls,
+            )
+            return {"audit": {"score": result.score, "by_kind": result.by_kind()}}
+        except Exception as exc:  # the cycle already committed; never fail it from here
+            log.warning("audit of cycle %s skipped: %s", cycle_id, exc)
+            try:
+                await deps.cycles.record_audit(
+                    cycle_id,
+                    score=None,
+                    items=0,
+                    detail={"error": f"{type(exc).__name__}: {exc}"[:500]},
+                )
+            except Exception:
+                log.exception("could not record the audit error for cycle %s", cycle_id)
+            return {}
+
+    async def _audit_items(state: SleepState) -> list[AuditItem]:
+        plan, _, _ = await view(state)
+        cands = {c.key: c for c in _candidates(state)}
+        links = [Link.model_validate(lk) for lk in state.get("links", [])]
+        texts = {k: ThemeText.model_validate(v) for k, v in state.get("theme_texts", {}).items()}
+        themes = [
+            (tp, texts[tp.key])
+            for tp in (ThemePlan.model_validate(p) for p in state.get("theme_plans", []))
+            if tp.key in texts
+        ]
+        refs = [lk.src for lk in links] + [lk.dst for lk in links]
+        refs += [r for sp in plan.supersessions for r in (sp.winner, sp.loser)]
+        ids = {UUID(v) for k, v in map(parse_ref, refs) if k == "n"}
+        ids |= {m.note_id for m in plan.merges}
+        notes = {n.id: n for n in await deps.store.notes_by_ids(list(ids))}
+
+        def text(ref: str) -> str:
+            kind, value = parse_ref(ref)
+            if kind == "c":
+                return cands[value].content
+            note = notes.get(UUID(value))
+            return note.content if note else "(missing)"
+
+        def since(ref: str) -> str:
+            kind, value = parse_ref(ref)
+            vf = cands[value].valid_from if kind == "c" else notes[UUID(value)].valid_from
+            return f"{vf:%Y-%m-%d}"
+
+        items: list[AuditItem] = []
+        for m in plan.merges:
+            for key in m.candidate_keys:
+                items.append(
+                    AuditItem(
+                        "merge", f"MERGE\nA: {cands[key].content}\nB: {notes[m.note_id].content}"
+                    )
+                )
+        for ins in plan.inserts:
+            for key in ins.folded_keys:
+                items.append(
+                    AuditItem("merge", f"MERGE\nA: {cands[key].content}\nB: {ins.content}")
+                )
+        for sp in plan.supersessions:
+            items.append(
+                AuditItem(
+                    "supersede",
+                    f"SUPERSEDE\nNEWER (since {since(sp.winner)}): {text(sp.winner)}\n"
+                    f"OLDER (since {since(sp.loser)}): {text(sp.loser)}\nReason given: {sp.reason}",
+                )
+            )
+        for lk in links:
+            items.append(
+                AuditItem("link", f"LINK\nA: {text(lk.src)}\nType: {lk.type}\nB: {text(lk.dst)}")
+            )
+        for tp, tt in themes:
+            facts = "\n".join(f"- {f.content}" for f in tp.facts[:10])
+            items.append(AuditItem("theme", f"THEME\n{theme_content(tt)}\nFacts:\n{facts}"))
+        return items
 
     g = StateGraph(SleepState)
     for name, fn in [
@@ -440,6 +554,7 @@ def build_sleep_graph(
         ("theme_prepare", theme_prepare),
         ("theme_judge", theme_judge),
         ("apply", apply),
+        ("audit", audit_node),
     ]:
         g.add_node(name, traced(name, fn))
     g.add_edge(START, "extract")
@@ -460,5 +575,6 @@ def build_sleep_graph(
     )
     g.add_conditional_edges("theme_prepare", theme_route, ["theme_judge", "apply"])
     g.add_conditional_edges("theme_judge", theme_route, ["theme_judge", "apply"])
-    g.add_edge("apply", END)
+    g.add_edge("apply", "audit")
+    g.add_edge("audit", END)
     return g.compile(checkpointer=checkpointer)

@@ -5,8 +5,9 @@
     2. Theme expansion: the facts summarised by the top themes.
     3. Graph expansion: one hop along related / elaborates / example_of / caused_by links
        from the top facts, in either direction.
-    4. Episode fallback: archived (already consolidated) episodes are searched too when the
-       best match is weak, or the question is about a past conversation ("you told me...").
+    4. Fallback: what the Forgetter archived (consolidated episodes, unused facts) is
+       searched too when the best match is weak, or the question is about a past
+       conversation ("you told me...").
     5. Temporal filter: a time phrase ("in March", "last week") admits superseded facts that
        were true then, and boosts notes whose valid time overlaps the window.
 
@@ -190,21 +191,26 @@ class HierarchicalRetriever:
                                    qvec=qvec, query=query, now=now, as_of=as_of,
                                    during=during)  # fmt: skip
 
-            # 4. Fallback to archived episodes
+            # 4. Fallback to what the Forgetter archived (turns and facts)
             fallback = False
-            if Tier.EPISODE in tiers:
+            archived_tiers = [t for t in (Tier.FACT, Tier.EPISODE) if t in tiers]
+            if archived_tiers:
                 best = max(
                     (h.base for h in hits.values() if h.scored.note.tier is not Tier.THEME),
                     default=0.0,
                 )
                 fallback = best < cfg.fallback_min_score or is_conversational(query)
                 if fallback:
-                    found = await self._store.hybrid_candidates(
-                        qvec, query, tiers=[Tier.EPISODE], statuses=[Status.ARCHIVED],
-                        pool_size=max(cfg.candidate_pool, k), as_of=as_of,
-                    )  # fmt: skip
-                    for s in self._rank(found, now):
-                        hits.setdefault(s.note.id, _Hit(s, via="fallback"))
+                    searches = [
+                        self._store.hybrid_candidates(
+                            qvec, query, tiers=[t], statuses=[Status.ARCHIVED],
+                            pool_size=max(cfg.candidate_pool, k), as_of=as_of,
+                        )
+                        for t in archived_tiers
+                    ]  # fmt: skip
+                    for found in await asyncio.gather(*searches):
+                        for s in self._rank(found, now):
+                            hits.setdefault(s.note.id, _Hit(s, via="fallback"))
 
             # 5. Final score: max(own, inherited) + temporal boost
             result: list[ScoredNote] = []

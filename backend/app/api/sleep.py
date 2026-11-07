@@ -42,6 +42,8 @@ class CycleOut(BaseModel):
     links_created: int
     themes_created: int
     themes_updated: int
+    audit_score: float | None
+    audit_items: int
     archived: int
     tokens_used: int
     llm_calls: int

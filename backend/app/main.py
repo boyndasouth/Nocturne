@@ -90,6 +90,7 @@ def create_app(
             tracer=tracer_,
             recent_turns=settings.recent_turns,
             reinforce_eta=settings.reinforce_eta,
+            reinforce_kappa=settings.reinforce_kappa,
             max_tokens=settings.online_max_tokens,
         )
         cycles = CycleStore(pool)

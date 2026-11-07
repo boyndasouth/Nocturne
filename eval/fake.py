@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from app.llm.client import ChatMessage, LLMResponse
 from app.llm.prompts import (
     ABSTRACTOR_SYSTEM,
+    AUDITOR_SYSTEM,
     CONTRADICTION_SYSTEM,
     DEDUP_SYSTEM,
     EXTRACTOR_SYSTEM,
@@ -90,6 +91,11 @@ class FakeLLM:
                 for n, first in _CLUSTER_RE.findall(user)
             ]
             return json.dumps({"themes": themes})
+        if system == AUDITOR_SYSTEM:
+            items = re.findall(r"^Item (\d+)$", user, re.M)
+            return json.dumps(
+                {"verdicts": [{"item": int(i), "verdict": "good", "note": ""} for i in items]}
+            )
         if system == RESPONDER_SYSTEM:
             hits = _MEMORY_RE.findall(user)
             return hits[0][:400] if hits else "I don't have that in memory."

@@ -155,7 +155,10 @@ def test_repeated_fact_is_merged_not_duplicated(make_client, fresh_db):
     [f] = facts(fresh_db)
     assert [str(x) for x in f["source_episode_ids"]] == [e1, e2]
     assert f["version"] == 2 and f["valid_from"] == JAN
-    [snap] = db(fresh_db, "select reason, snapshot from memory_versions")
+    # (The Forgetter also archives the January turn, which has its own snapshot.)
+    [snap] = db(
+        fresh_db, "select reason, snapshot from memory_versions where note_id = %s", f["id"]
+    )
     assert snap["reason"].startswith("merged") and len(snap["snapshot"]["source_episode_ids"]) == 1
 
 

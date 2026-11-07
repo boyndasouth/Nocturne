@@ -130,6 +130,7 @@ class NocturneSystem:
             writer=EpisodeWriter(self._store, embedder),
             recent_turns=settings.recent_turns,
             reinforce_eta=settings.reinforce_eta,
+            reinforce_kappa=settings.reinforce_kappa,
             max_tokens=settings.online_max_tokens,
         )
         self._runner = (
