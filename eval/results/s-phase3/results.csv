@@ -1,0 +1,143 @@
+system,dataset,split,conversation_id,question_id,category,question_type,abstention,question,gold,answer,correct,rubric,judge_raw,retrieval_ms,retrieved,retrieved_via,context_chars,answer_tokens,judge_tokens,status,error
+full-context,longmemeval-s,test,0ddfec37_abs,0ddfec37_abs,abstention,knowledge-update,True,How many autographed football have I added to my collection in the first three months of collection?,The information provided is not enough. You mentioned collecting autographed baseball but not football.,"I’m sorry, but I don’t have any record of how many autographed footballs you added to your collection during the first three months. If you have that information elsewhere, feel free to share it and I can help you track or analyze it.",True,abstention,yes,,0,,19635,4432,282,ok,
+full-context,longmemeval-s,test,edced276_abs,edced276_abs,abstention,multi-session,True,How many days did I spend in total traveling in Hawaii and in Seattle?,The information provided is not enough. You mentioned traveling for 10 days in Hawaii but did not mention abything about the trip to Seattle.,"I don’t have any information in memory about your travel dates or the number of days you spent in Hawaii and Seattle, so I can’t calculate the total for you.",True,abstention,yes,,0,,16837,4292,268,ok,
+full-context,longmemeval-s,dev,d7c942c3,d7c942c3,knowledge-update,knowledge-update,False,Is my mom using the same grocery list method as me?,Yes.,"I don’t have any information in my memory about you or your mom’s grocery‑list method, so I can’t tell whether you use the same approach. If you share a bit more about how each of you organizes your list, I can help compare the methods.",False,knowledge-update,no,,0,,18476,4202,254,ok,
+full-context,longmemeval-s,test,e61a7584,e61a7584,knowledge-update,knowledge-update,False,"How long have I had my cat, Luna?",9 months,"I don’t have any information about a cat named Luna in the stored memories, so I can’t tell how long you’ve had her. If you share some details, I can help you figure out a timeline or give advice on caring for her.",False,knowledge-update,no,,0,,19045,4044,250,ok,
+full-context,longmemeval-s,test,4f54b7c9,4f54b7c9,multi-session,multi-session,False,How many antique items did I inherit or acquire from my family members?,5,"I don’t have any information in my memory about antique items you inherited or acquired from family members. If you’d like to share those details, I can help you keep track of them.",False,default,no,,0,,19374,4824,259,ok,
+full-context,longmemeval-s,test,gpt4_f2262a51,gpt4_f2262a51,multi-session,multi-session,False,How many different doctors did I visit?,"I visited three different doctors: a primary care physician, an ENT specialist, and a dermatologist.","I don’t have any information in my memory about doctor visits, so I can’t tell how many different doctors you’ve seen. If you provide those details, I can help you keep track of them.",False,default,no,,0,,18947,4602,270,ok,
+full-context,longmemeval-s,test,1568498a,1568498a,single-session-assistant,single-session-assistant,False,"I'm looking back at our previous chess game and I was wondering, what was the move you made after 27. Kg2 Bd5+?",28. Kg3,"I’m sorry, but I don’t have any record of that chess game in the memories you provided, so I can’t tell you what move I made after 27. Kg2 Bd5+. If you can share the relevant moves or details, I’ll be happy to help analyze the position.",False,default,no,,0,,18695,4708,303,ok,
+full-context,longmemeval-s,test,1c0ddc50,1c0ddc50,single-session-preference,single-session-preference,False,Can you suggest some activities I can do during my commute to work?,"The user would prefer suggestions related to listening to new podcasts or audiobooks, especially the genre beyond true crime or self-improvement, such as history. They may not be interested in activities that require visual attention, such as reading or watching videos, as they are commuting. The user would not prefer general podcast topics such as true crime or self-improvement, as the user wants to explore other topics.","Sure! Here are a few ideas you can try on your commute (whether you’re driving, taking public transit, or walking/biking):
+
+| Type of Commute | Activity Ideas | How to Make It Work |
+|-----------------|----------------|---------------------|
+| **Driving** | • Listen to audiobooks or podcasts (news, true‑crime, self‑improvement, comedy) <br>• Practice a language with a language‑learning audio course <br>• Plan your day with a voice‑memo app or mental “to‑do” list <br>• Do simple mindfulness breathing exercises (focus on the breath while stopped at lights) | Keep your hands on the wheel and eyes on the road—only audio‑only activities are safe. |
+| **Public Transit (bus, train, subway)** | • Read (e‑book, physical book, or articles saved for offline) <br>• Play puzzle or word games on your phone (crossword, Sudoku, 2048) <br>• Write in a journal or draft a short email/creative piece <br>• Learn a new skill with short video lessons (language, coding, cooking) <br>• Meditate with a guided app (use headphones) | Make sure you have a charged device and headphones; keep an eye on your stop announcements. |
+| **Walking / Biking** | • Listen to music playlists that match your pace <br>• Practice “mindful walking” – notice sights, sounds, and sensations <br>• Recite or memorize something (a poem, a speech, a language phrase list) <br>• Take photos of interesting street art or architecture for a later photo‑journal project | Wear safe, visible clothing and stay aware of traffic. |
+| **Hybrid (drive‑then‑transit)** | • Use the driving portion for audio content, then switch to reading or games once you’re on the train <br>• Review a daily “flashcard” deck during the transition (e.g., language vocab) | Plan the switch in advance so you can quickly move between activities. |
+| **General Productivity** | • Review your calendar and set priorities for the day <br>• Send quick “check‑in” messages to teammates <br>• Brainstorm ideas for a personal project using a note‑taking app <br>• Practice gratitude by listing three things you’re thankful for | Keep a small notebook or notes app handy for quick jotting. |
+
+**Tips to stay balanced**
+
+1. **Set a timer** – If you tend to get lost in a podcast or game, a gentle alarm can remind you to wrap up before you need to disembark.  
+2. **Mix it up** – Rotate activities so the commute stays fresh and you don’t get bored.  
+3. **Stay safe** – For driving, stick to audio‑only content; for transit, keep headphones at a volume that still lets you hear announcements.  
+
+Enjoy turning that travel time into something productive, relaxing, or fun!",False,preference,no,,0,,18782,5239,967,ok,
+full-context,longmemeval-s,test,8a137a7f,8a137a7f,single-session-user,single-session-user,False,What type of bulb did I replace in my bedside lamp?,Philips LED bulb,I don’t have any record of the bulb you replaced in your bedside lamp.,False,default,no,,0,,19380,4543,254,ok,
+full-context,longmemeval-s,test,gpt4_65aabe59,gpt4_65aabe59,temporal-reasoning,temporal-reasoning,False,"Which device did I set up first, the smart thermostat or the mesh network system?",Smart thermostat,"I don’t have any record of you setting up either a smart thermostat or a mesh‑network system in the stored memories, so I can’t tell which one you installed first.",False,temporal,no,,0,,18911,4391,327,ok,
+naive-rag,longmemeval-s,test,0ddfec37_abs,0ddfec37_abs,abstention,knowledge-update,True,How many autographed football have I added to my collection in the first three months of collection?,The information provided is not enough. You mentioned collecting autographed baseball but not football.,"I don’t have any record of you adding autographed footballs to your collection. The memories only mention autographed baseballs (20 added over the past few months [M1] and 15 added in the first three months of collecting [M3]). So, based on what’s in memory, you haven’t logged any autographed footballs yet.",True,abstention,yes,50.71,8,,16141,3773,302,ok,
+naive-rag,longmemeval-s,test,edced276_abs,edced276_abs,abstention,multi-session,True,How many days did I spend in total traveling in Hawaii and in Seattle?,The information provided is not enough. You mentioned traveling for 10 days in Hawaii but did not mention abything about the trip to Seattle.,"I’m sorry, but I don’t have any information in my memory about the dates or duration of your trips to Hawaii or Seattle, so I can’t calculate the total number of days you spent traveling there. If you provide the details, I’d be happy to help you add them up.",True,abstention,yes,15.14,8,,20662,5059,293,ok,
+naive-rag,longmemeval-s,dev,d7c942c3,d7c942c3,knowledge-update,knowledge-update,False,Is my mom using the same grocery list method as me?,Yes.,"Yes—your mom is now using the same grocery‑list app as you, so you can share lists and keep track of what you need together [M1].",True,knowledge-update,yes,12.34,8,,14804,3752,255,ok,
+naive-rag,longmemeval-s,test,e61a7584,e61a7584,knowledge-update,knowledge-update,False,"How long have I had my cat, Luna?",9 months,You’ve had Luna for about nine months as of now (2023‑11‑30)【M3】.,True,knowledge-update,yes,16.02,8,,16208,3934,226,ok,
+naive-rag,longmemeval-s,test,4f54b7c9,4f54b7c9,multi-session,multi-session,False,How many antique items did I inherit or acquire from my family members?,5,"You’ve inherited or acquired **five** distinct antique items from family members:  
+
+1. Antique tea set (cousin Rachel)  
+2. Vintage typewriter (dad)  
+3. Grandmother’s vintage diamond necklace  
+4. Antique music box (great‑aunt)  
+5. Depression‑era glassware set (mom)  ",True,default,yes,13.98,8,,20640,4929,291,ok,
+naive-rag,longmemeval-s,test,gpt4_f2262a51,gpt4_f2262a51,multi-session,multi-session,False,How many different doctors did I visit?,"I visited three different doctors: a primary care physician, an ENT specialist, and a dermatologist.","Based on the notes you’ve shared, you’ve mentioned three distinct doctors: Dr. Patel, Dr. Lee, and Dr. Smith [M1][M4][M7].",True,default,yes,16.34,8,,15574,3903,288,ok,
+naive-rag,longmemeval-s,test,1568498a,1568498a,single-session-assistant,single-session-assistant,False,"I'm looking back at our previous chess game and I was wondering, what was the move you made after 27. Kg2 Bd5+?",28. Kg3,After 27…Bd5+ I replied with 28.Kg3. [see M3 and M8],True,default,yes,193.37,8,,4688,2301,269,ok,
+naive-rag,longmemeval-s,test,1c0ddc50,1c0ddc50,single-session-preference,single-session-preference,False,Can you suggest some activities I can do during my commute to work?,"The user would prefer suggestions related to listening to new podcasts or audiobooks, especially the genre beyond true crime or self-improvement, such as history. They may not be interested in activities that require visual attention, such as reading or watching videos, as they are commuting. The user would not prefer general podcast topics such as true crime or self-improvement, as the user wants to explore other topics.","Here are a few easy‑to‑do activities you can try while you’re biking to work:
+
+**Productive options**  
+- **Audiobooks or podcasts** – pick topics that interest you (e.g., entrepreneurship, history, industry news).  
+- **Language‑learning apps** (Duolingo, Babbel, etc.) – short lessons fit nicely into a 40‑minute ride.  
+- **Daily planning** – mentally review your tasks, prioritize, and set a quick agenda for the day.  
+
+**Entertaining options**  
+- **Music playlists** – create a high‑energy set to keep you motivated or a chill mix for a relaxed ride.  
+- **Storytelling podcasts** (e.g., *How I Built This*, *Stuff You Should Know*) – great for a fun, engaging ride.  
+- **Comedy clips or short stand‑up bits** – a quick laugh can boost your mood.  
+
+**Safety‑first tips**  
+- Keep the volume low enough to stay aware of traffic.  
+- Use a phone mount or armband so you can control playback without taking your hands off the handlebars.  
+
+These ideas let you turn a routine bike commute into a productive and enjoyable part of your day【M1】.",True,preference,yes,13.61,8,,16910,4269,631,ok,
+naive-rag,longmemeval-s,test,8a137a7f,8a137a7f,single-session-user,single-session-user,False,What type of bulb did I replace in my bedside lamp?,Philips LED bulb,You mentioned that the bulb you have in your bedside lamp is a **Philips LED bulb**【M1】.,True,default,yes,30.87,8,,17683,4383,246,ok,
+naive-rag,longmemeval-s,test,gpt4_65aabe59,gpt4_65aabe59,temporal-reasoning,temporal-reasoning,False,"Which device did I set up first, the smart thermostat or the mesh network system?",Smart thermostat,"I don’t have any memory of you setting up a smart thermostat, only of the mesh network system you upgraded a few weeks ago. So I can’t tell which of those two you installed first.",False,temporal,no,17.44,8,,19986,4837,378,ok,
+nocturne,longmemeval-s,test,0ddfec37_abs,0ddfec37_abs,abstention,knowledge-update,True,How many autographed football have I added to my collection in the first three months of collection?,The information provided is not enough. You mentioned collecting autographed baseball but not football.,I don’t have any record of how many autographed footballs you added in the first three months of your collection. The memories only mention autographed baseballs (15 – 20) but not footballs.,True,abstention,yes,71.43,10,episode/search:7 fact/search:1 theme:2,7740,2227,247,ok,
+nocturne,longmemeval-s,test,edced276_abs,edced276_abs,abstention,multi-session,True,How many days did I spend in total traveling in Hawaii and in Seattle?,The information provided is not enough. You mentioned traveling for 10 days in Hawaii but did not mention abything about the trip to Seattle.,"You spent 10 days on your recent family trip to Hawaii [M5]. I don’t have any record of a trip to Seattle in the memories, so I can’t tell you how many days you spent there.",True,abstention,yes,17.39,10,episode/search:7 fact/search:1 theme:2,7357,2168,283,ok,
+nocturne,longmemeval-s,dev,d7c942c3,d7c942c3,knowledge-update,knowledge-update,False,Is my mom using the same grocery list method as me?,Yes.,"Yes—your mom is using the same grocery‑list app you are, so you both share the same method for organizing lists and tracking what you need [M4].",True,knowledge-update,yes,14.04,10,episode/search:5 fact/search:2 fact/theme:1 theme:2,6505,1868,255,ok,
+nocturne,longmemeval-s,test,e61a7584,e61a7584,knowledge-update,knowledge-update,False,"How long have I had my cat, Luna?",9 months,You’ve had Luna for about nine months — the current fact records that you’ve owned your cat for roughly nine months as of late November 2023 [M4].,True,knowledge-update,yes,150.97,10,episode/search:5 fact/search:3 theme:2,6352,1917,235,ok,
+nocturne,longmemeval-s,test,4f54b7c9,4f54b7c9,multi-session,multi-session,False,How many antique items did I inherit or acquire from my family members?,5,"You’ve mentioned five antique items that came from family members:
+
+1. Your grandmother’s vintage diamond necklace [​M1]  
+2. The antique music box from your great‑aunt [​M7]  
+3. The set of depression‑era glassware from your mom [​M7]  
+4. The antique tea set you received from your cousin Rachel [​M3]  
+5. The vintage typewriter that belonged to your dad [​M3]  
+
+So, the total is **five** family‑related antique items.",True,default,yes,62.64,10,episode/search:8 theme:2,8173,2418,341,ok,
+nocturne,longmemeval-s,test,gpt4_f2262a51,gpt4_f2262a51,multi-session,multi-session,False,How many different doctors did I visit?,"I visited three different doctors: a primary care physician, an ENT specialist, and a dermatologist.","Based on the information in your memories, you’ve mentioned visits to two distinct doctors:
+
+1. **Dr. Smith** – your primary‑care physician at As Clinic.  
+2. **Dr. Lee** – the doctor you saw for a biopsy of the mole on your back.  
+
+No other doctors are named in the stored records, so the count is **two** different doctors.",False,default,no,43.47,10,episode/search:8 theme:2,8112,2355,315,ok,
+nocturne,longmemeval-s,test,1568498a,1568498a,single-session-assistant,single-session-assistant,False,"I'm looking back at our previous chess game and I was wondering, what was the move you made after 27. Kg2 Bd5+?",28. Kg3,After 27…Bd5+ I continued with 28. Kg3. [M3],True,default,yes,24.02,10,episode/search:8 theme:2,6520,2580,263,ok,
+nocturne,longmemeval-s,test,1c0ddc50,1c0ddc50,single-session-preference,single-session-preference,False,Can you suggest some activities I can do during my commute to work?,"The user would prefer suggestions related to listening to new podcasts or audiobooks, especially the genre beyond true crime or self-improvement, such as history. They may not be interested in activities that require visual attention, such as reading or watching videos, as they are commuting. The user would not prefer general podcast topics such as true crime or self-improvement, as the user wants to explore other topics.","Here are a few ideas you can try on your 40‑minute weekday bike ride to make the time feel more productive and enjoyable:
+
+**1. Audio learning**  
+- **Podcasts** – Keep listening to the shows you already enjoy (e.g., *How I Built This*) and add a few history or science titles to broaden your interests [M2].  
+- **Audiobooks** – Choose shorter nonfiction books or fiction that fit into a 40‑minute chunk; you can finish an episode or chapter each way.
+
+**2. Language practice**  
+- Use a language‑learning app that offers audio lessons (e.g., Duolingo, Pimsleur). The spoken format works well while you’re pedaling, and you can track progress each day.
+
+**3. Mind‑fullness & mental reset**  
+- **Guided meditations** – Short 5‑10‑minute sessions (e.g., Headspace, Insight Timer) can help reduce anxiety and start the day calm.  
+- **Breathing exercises** – Simple box‑breathing or “4‑7‑8” techniques can be done safely while riding in a safe lane.
+
+**4. Personal development**  
+- **Goal‑setting reviews** – Record a quick voice note about your top three priorities for the day, then check them off later.  
+- **Micro‑learning** – Listen to 5‑minute “micro‑courses” on topics like productivity, finance, or creativity.
+
+**5. Entertainment & social connection**  
+- **Music playlists** – Curate upbeat or chill playlists that match the pace of your ride.  
+- **Audio games** – Some apps offer narrative‑driven audio games that work hands‑free, adding a fun challenge to the commute.
+
+**6. Physical‑brain combo**  
+- **Bike‑friendly trivia** – Download a trivia podcast or app and test yourself on random facts; you’ll stay mentally sharp while staying active.
+
+These activities let you stay productive, entertained, and relaxed without taking your eyes off the road. Feel free to mix and match depending on the day’s mood!",True,preference,yes,17.54,10,episode/search:8 theme:2,7894,2635,825,ok,
+nocturne,longmemeval-s,test,8a137a7f,8a137a7f,single-session-user,single-session-user,False,What type of bulb did I replace in my bedside lamp?,Philips LED bulb,I don’t have a record of what type of bulb you replaced in your bedside lamp; the only information I have is that you now have a Philips LED bulb in that lamp.,True,default,yes,66.57,10,episode/search:6 fact/search:1 fact/theme:1 theme:2,7175,2111,272,ok,
+nocturne,longmemeval-s,test,gpt4_65aabe59,gpt4_65aabe59,temporal-reasoning,temporal-reasoning,False,"Which device did I set up first, the smart thermostat or the mesh network system?",Smart thermostat,"I don’t have any record of you setting up a smart thermostat in the memories you provided, so I can’t tell which of the two you installed first. The only device mentioned is the mesh network system, which you upgraded in mid‑January.",False,temporal,no,22.35,10,episode/search:6 fact/search:2 theme:2,7420,2097,350,ok,
+nocturne-no-sleep,longmemeval-s,test,0ddfec37_abs,0ddfec37_abs,abstention,knowledge-update,True,How many autographed football have I added to my collection in the first three months of collection?,The information provided is not enough. You mentioned collecting autographed baseball but not football.,I don’t have any record of you adding autographed footballs to your collection in the memories you provided. The only counts mentioned are for autographed baseballs (15 in the first three months [M3] and 20 in the past few months [M2]).,True,abstention,yes,36.55,8,episode/search:8,7655,2171,287,ok,
+nocturne-no-sleep,longmemeval-s,test,edced276_abs,edced276_abs,abstention,multi-session,True,How many days did I spend in total traveling in Hawaii and in Seattle?,The information provided is not enough. You mentioned traveling for 10 days in Hawaii but did not mention abything about the trip to Seattle.,I don’t have any record of how many days you spent traveling in Hawaii or in Seattle in the memories you provided.,True,abstention,yes,11.64,8,episode/search:8,7198,2076,267,ok,
+nocturne-no-sleep,longmemeval-s,dev,d7c942c3,d7c942c3,knowledge-update,knowledge-update,False,Is my mom using the same grocery list method as me?,Yes.,"Yes—based on what you told me, your mom is now using the same grocery‑list app as you so you can share lists together [M1].",True,knowledge-update,yes,11.71,8,episode/search:8,7656,2125,267,ok,
+nocturne-no-sleep,longmemeval-s,test,e61a7584,e61a7584,knowledge-update,knowledge-update,False,"How long have I had my cat, Luna?",9 months,You’ve had Luna for about nine months as you mentioned in your earlier note [M1].,True,knowledge-update,yes,51.03,8,episode/search:8,7459,2097,218,ok,
+nocturne-no-sleep,longmemeval-s,test,4f54b7c9,4f54b7c9,multi-session,multi-session,False,How many antique items did I inherit or acquire from my family members?,5,"You’ve mentioned five distinct family‑related antique items:
+
+1. Antique tea set – received from your cousin Rachel【M1】  
+2. Vintage typewriter – belonged to your dad【M1】  
+3. Grandmother’s vintage diamond necklace – inherited【M5】  
+4. Antique music box – from your great‑aunt【M5】  
+5. Set of depression‑era glassware – from your mom【M5】
+
+So, you have **five** antique items that came from family members.",True,default,yes,9.19,8,episode/search:8,7655,2262,325,ok,
+nocturne-no-sleep,longmemeval-s,test,gpt4_f2262a51,gpt4_f2262a51,multi-session,multi-session,False,How many different doctors did I visit?,"I visited three different doctors: a primary care physician, an ENT specialist, and a dermatologist.","I don’t have enough information in the stored memories to determine how many different doctors you’ve visited. The only specific doctor mentioned is Dr. Lee for a biopsy, and the colonoscopy discussion doesn’t name a particular physician. If you provide a list of the doctors you’ve seen, I can help you count them.",False,default,no,14.48,8,episode/search:8,7655,2206,326,ok,
+nocturne-no-sleep,longmemeval-s,test,1568498a,1568498a,single-session-assistant,single-session-assistant,False,"I'm looking back at our previous chess game and I was wondering, what was the move you made after 27. Kg2 Bd5+?",28. Kg3,After 27 Kg2 I continued with the checking move 27…Bd5+ [​M5​].,False,default,no,307.02,8,episode/search:8,6053,2546,298,ok,
+nocturne-no-sleep,longmemeval-s,test,1c0ddc50,1c0ddc50,single-session-preference,single-session-preference,False,Can you suggest some activities I can do during my commute to work?,"The user would prefer suggestions related to listening to new podcasts or audiobooks, especially the genre beyond true crime or self-improvement, such as history. They may not be interested in activities that require visual attention, such as reading or watching videos, as they are commuting. The user would not prefer general podcast topics such as true crime or self-improvement, as the user wants to explore other topics.","Here are a few ideas you can try on your bike commute (about 40 minutes each way) to stay productive, entertained, and refreshed:
+
+| Type | Specific activity | How to fit it into a 40‑minute ride |
+|------|-------------------|-------------------------------------|
+| **Audio learning** | • Audiobooks (fiction or non‑fiction)  <br>• Podcasts – e.g., “How I Built This,” history shows like *Hardcore History*, *Lore*, *The Dollop* | Load a playlist before you leave and let the episodes play straight through. A 40‑minute slot is perfect for one short episode or a chapter of an audiobook. (You’ve already been enjoying podcasts on your bus ride, so this is a natural extension [M1]) |
+| **Language practice** | • Language‑learning podcasts or apps (Duolingo, Pimsleur) <br>• Listen to short dialogues and repeat aloud | Choose a 10‑minute lesson and repeat key phrases while you ride; the remaining time can be filler listening. |
+| **Mind‑fulness & mental reset** | • Guided meditation or breathing exercises (5‑10 min) <br>• “Gratitude roll‑call” – mentally list three things you’re grateful for | Use a calm, voice‑guided track that fits the length of your ride; you’ll start the day centered and end it relaxed. |
+| **Creative brainstorming** | • Record voice notes for work ideas, personal projects, or story outlines <br>• Use a “question‑prompt” list (e.g., “What’s one small improvement I can make today?”) | Speak into your phone’s recorder or a note‑taking app; the rhythm of pedaling often helps ideas flow. |
+| **Social connection** | • Call a friend or family member (hands‑free) <br>• Send quick voice messages to teammates | Keep calls brief (5‑10 min) so you stay safe on the road; use a Bluetooth headset. |
+| **Light entertainment** | • Short comedy or storytelling podcasts <br>• “Audio games” like “Choose Your Own Adventure” podcasts where you make decisions at pauses | Pick episodes under 20 minutes so you can finish before you arrive. |
+| **Physical warm‑up / cool‑down** | • Stretching before you lock the bike (neck, shoulders, calves) <br>• Quick 2‑minute “bike‑pause” breathing drills at a stoplight | These micro‑stretches improve circulation and reduce post‑ride stiffness. |
+
+**Tips for smooth execution**
+
+1. **Prepare a queue** the night before so you don’t fumble with your phone while riding.  
+2. **Use a waterproof case or mount** to keep your device secure and visible.  
+3. **Set a volume level** that lets you stay aware of traffic and surroundings.  
+4. **Mix it up** – rotate between learning, relaxation, and fun to keep the commute fresh.
+
+Feel free to let me know which of these sound most appealing, and I can help you build a concrete schedule or suggest specific titles/playlists!",True,preference,yes,9.72,8,episode/search:8,7364,2754,988,ok,
+nocturne-no-sleep,longmemeval-s,test,8a137a7f,8a137a7f,single-session-user,single-session-user,False,What type of bulb did I replace in my bedside lamp?,Philips LED bulb,You said you were using a **Philips LED bulb** in your bedside lamp — that’s the bulb you’ve been replacing there [M1][M2].,True,default,yes,50.84,8,episode/search:8,7656,2178,260,ok,
+nocturne-no-sleep,longmemeval-s,test,gpt4_65aabe59,gpt4_65aabe59,temporal-reasoning,temporal-reasoning,False,"Which device did I set up first, the smart thermostat or the mesh network system?",Smart thermostat,"I don’t have any record of you mentioning a smart thermostat in the stored memories, so I can’t tell which of those two devices you set up first.",False,temporal,no,28.41,8,episode/search:8,7656,2140,323,ok,

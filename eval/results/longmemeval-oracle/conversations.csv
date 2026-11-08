@@ -1,0 +1,139 @@
+system,dataset,conversation_id,episodes,memory_items,memory_chars,memory_episode,memory_fact,memory_theme,sleep_cycles,facts_created,merges,supersessions,prep_seconds,sleep_tokens,sleep_calls,sleep_cache_hits,truncated_episodes,status,error
+full-context,longmemeval-oracle,06db6396,12,7,32090,12,0,0,0,0,0,0,0.0,0,0,0,5,ok,
+full-context,longmemeval-oracle,10d9b85a,11,5,35554,11,0,0,0,0,0,0,0.0,0,0,0,6,ok,
+full-context,longmemeval-oracle,1c0ddc50,6,6,17276,6,0,0,0,0,0,0,0.0,0,0,0,0,ok,
+full-context,longmemeval-oracle,2133c1b5_abs,12,9,25039,12,0,0,0,0,0,0,0.01,0,0,0,3,ok,
+full-context,longmemeval-oracle,22d2cb42,12,10,23992,12,0,0,0,0,0,0,0.0,0,0,0,2,ok,
+full-context,longmemeval-oracle,35a27287,7,6,21915,7,0,0,0,0,0,0,0.0,0,0,0,1,ok,
+full-context,longmemeval-oracle,36b9f61e,18,8,45387,18,0,0,0,0,0,0,0.0,0,0,0,10,ok,
+full-context,longmemeval-oracle,3e321797,4,4,2707,4,0,0,0,0,0,0,0.0,0,0,0,0,ok,
+full-context,longmemeval-oracle,4c36ccef,4,4,3071,4,0,0,0,0,0,0,0.0,0,0,0,0,ok,
+full-context,longmemeval-oracle,65240037,7,7,8614,7,0,0,0,0,0,0,0.0,0,0,0,0,ok,
+full-context,longmemeval-oracle,6f9b354f,5,5,14389,5,0,0,0,0,0,0,0.0,0,0,0,0,ok,
+full-context,longmemeval-oracle,71315a70,12,7,35230,12,0,0,0,0,0,0,0.0,0,0,0,5,ok,
+full-context,longmemeval-oracle,88432d0a_abs,24,8,55385,24,0,0,0,0,0,0,0.0,0,0,0,16,ok,
+full-context,longmemeval-oracle,8a2466db,9,7,25648,9,0,0,0,0,0,0,0.0,0,0,0,2,ok,
+full-context,longmemeval-oracle,ac031881,16,16,8684,16,0,0,0,0,0,0,0.0,0,0,0,0,ok,
+full-context,longmemeval-oracle,c960da58,6,6,15676,6,0,0,0,0,0,0,0.0,0,0,0,0,ok,
+full-context,longmemeval-oracle,caf03d32,9,8,20178,9,0,0,0,0,0,0,0.0,0,0,0,1,ok,
+full-context,longmemeval-oracle,dfde3500,11,10,20373,11,0,0,0,0,0,0,0.01,0,0,0,1,ok,
+full-context,longmemeval-oracle,e493bb7c,12,7,30570,12,0,0,0,0,0,0,0.0,0,0,0,5,ok,
+full-context,longmemeval-oracle,e831120c,12,11,21067,12,0,0,0,0,0,0,0.0,0,0,0,1,ok,
+full-context,longmemeval-oracle,edced276_abs,9,7,25865,9,0,0,0,0,0,0,0.02,0,0,0,2,ok,
+full-context,longmemeval-oracle,gpt4_213fd887,12,6,35708,12,0,0,0,0,0,0,0.0,0,0,0,6,ok,
+naive-rag,longmemeval-oracle,06db6396,12,12,32090,12,0,0,0,0,0,0,3.5,0,0,0,,ok,
+naive-rag,longmemeval-oracle,10d9b85a,11,11,35554,11,0,0,0,0,0,0,3.76,0,0,0,,ok,
+naive-rag,longmemeval-oracle,1c0ddc50,6,6,17276,6,0,0,0,0,0,0,1.12,0,0,0,,ok,
+naive-rag,longmemeval-oracle,2133c1b5_abs,12,12,25039,12,0,0,0,0,0,0,3.46,0,0,0,,ok,
+naive-rag,longmemeval-oracle,22d2cb42,12,12,23992,12,0,0,0,0,0,0,2.8,0,0,0,,ok,
+naive-rag,longmemeval-oracle,35a27287,7,7,21915,7,0,0,0,0,0,0,1.68,0,0,0,,ok,
+naive-rag,longmemeval-oracle,36b9f61e,18,18,45387,18,0,0,0,0,0,0,5.87,0,0,0,,ok,
+naive-rag,longmemeval-oracle,3e321797,4,4,2707,4,0,0,0,0,0,0,0.52,0,0,0,,ok,
+naive-rag,longmemeval-oracle,4c36ccef,4,4,3071,4,0,0,0,0,0,0,0.67,0,0,0,,ok,
+naive-rag,longmemeval-oracle,65240037,7,7,8614,7,0,0,0,0,0,0,0.86,0,0,0,,ok,
+naive-rag,longmemeval-oracle,6f9b354f,5,5,14389,5,0,0,0,0,0,0,2.56,0,0,0,,ok,
+naive-rag,longmemeval-oracle,71315a70,12,12,35230,12,0,0,0,0,0,0,2.79,0,0,0,,ok,
+naive-rag,longmemeval-oracle,88432d0a_abs,24,24,55385,24,0,0,0,0,0,0,5.35,0,0,0,,ok,
+naive-rag,longmemeval-oracle,8a2466db,9,9,25648,9,0,0,0,0,0,0,3.91,0,0,0,,ok,
+naive-rag,longmemeval-oracle,ac031881,16,16,8684,16,0,0,0,0,0,0,1.96,0,0,0,,ok,
+naive-rag,longmemeval-oracle,c960da58,6,6,15676,6,0,0,0,0,0,0,1.31,0,0,0,,ok,
+naive-rag,longmemeval-oracle,caf03d32,9,9,20178,9,0,0,0,0,0,0,1.65,0,0,0,,ok,
+naive-rag,longmemeval-oracle,dfde3500,11,11,20373,11,0,0,0,0,0,0,4.54,0,0,0,,ok,
+naive-rag,longmemeval-oracle,e493bb7c,12,12,30570,12,0,0,0,0,0,0,2.63,0,0,0,,ok,
+naive-rag,longmemeval-oracle,e831120c,12,12,21067,12,0,0,0,0,0,0,2.26,0,0,0,,ok,
+naive-rag,longmemeval-oracle,edced276_abs,9,9,25865,9,0,0,0,0,0,0,6.22,0,0,0,,ok,
+naive-rag,longmemeval-oracle,gpt4_213fd887,12,12,35708,12,0,0,0,0,0,0,2.93,0,0,0,,ok,
+nocturne,longmemeval-oracle,06db6396,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,10d9b85a,11,47,38663,11,36,0,2,38,5,2,64.66,22776,10,4,,ok,
+nocturne,longmemeval-oracle,1c0ddc50,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,2133c1b5_abs,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,22d2cb42,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,35a27287,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,36b9f61e,18,78,49442,18,60,0,3,62,4,2,248.5,35646,15,0,,ok,
+nocturne,longmemeval-oracle,3e321797,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,4c36ccef,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,65240037,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,6f9b354f,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,71315a70,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,88432d0a_abs,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,8a2466db,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,ac031881,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,caf03d32,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,dfde3500,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,e493bb7c,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,e831120c,12,38,22518,12,26,0,2,27,2,1,26.08,16743,7,5,,ok,
+nocturne,longmemeval-oracle,edced276_abs,,,,,,,,,,,,,,,,error,"RetryableLLMError: gemini: HTTP 429: [{
+  ""error"": {
+    ""code"": 429,
+    ""message"": ""You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota e"
+nocturne,longmemeval-oracle,gpt4_213fd887,12,42,37497,12,30,0,2,33,3,3,137.58,21513,10,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,06db6396,12,12,32090,12,0,0,0,0,0,0,0.06,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,10d9b85a,11,11,35554,11,0,0,0,0,0,0,0.08,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,1c0ddc50,6,6,17276,6,0,0,0,0,0,0,0.06,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,2133c1b5_abs,12,12,25039,12,0,0,0,0,0,0,0.13,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,22d2cb42,12,12,23992,12,0,0,0,0,0,0,0.06,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,35a27287,7,7,21915,7,0,0,0,0,0,0,0.07,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,36b9f61e,18,18,45387,18,0,0,0,0,0,0,0.07,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,3e321797,4,4,2707,4,0,0,0,0,0,0,0.05,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,4c36ccef,4,4,3071,4,0,0,0,0,0,0,0.1,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,65240037,7,7,8614,7,0,0,0,0,0,0,0.05,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,6f9b354f,5,5,14389,5,0,0,0,0,0,0,0.47,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,71315a70,12,12,35230,12,0,0,0,0,0,0,0.06,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,88432d0a_abs,24,24,55385,24,0,0,0,0,0,0,0.08,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,8a2466db,9,9,25648,9,0,0,0,0,0,0,0.1,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,ac031881,16,16,8684,16,0,0,0,0,0,0,0.08,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,c960da58,6,6,15676,6,0,0,0,0,0,0,0.06,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,caf03d32,9,9,20178,9,0,0,0,0,0,0,0.06,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,dfde3500,11,11,20373,11,0,0,0,0,0,0,0.15,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,e493bb7c,12,12,30570,12,0,0,0,0,0,0,0.07,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,e831120c,12,12,21067,12,0,0,0,0,0,0,0.05,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,edced276_abs,9,9,25865,9,0,0,0,0,0,0,0.85,0,0,0,,ok,
+nocturne-no-sleep,longmemeval-oracle,gpt4_213fd887,12,12,35708,12,0,0,0,0,0,0,0.12,0,0,0,,ok,

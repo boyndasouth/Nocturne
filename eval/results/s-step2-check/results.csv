@@ -1,0 +1,10 @@
+system,dataset,split,conversation_id,question_id,category,question_type,abstention,question,gold,answer,correct,rubric,judge_raw,retrieval_ms,retrieved,context_chars,answer_tokens,judge_tokens,status,error
+nocturne,longmemeval-s,test,edced276_abs,edced276_abs,abstention,multi-session,True,How many days did I spend in total traveling in Hawaii and in Seattle?,The information provided is not enough. You mentioned traveling for 10 days in Hawaii but did not mention abything about the trip to Seattle.,"You spent 10 days on your recent family trip to Hawaii [M3]. I don’t have any record of a trip to Seattle in the memories, so I can’t tell you how many days you spent there.",True,abstention,yes,70.29,8,6756,1986,282,ok,
+nocturne,longmemeval-s,dev,d7c942c3,d7c942c3,knowledge-update,knowledge-update,False,Is my mom using the same grocery list method as me?,Yes.,"Yes—your mom is using the same grocery‑list app as you, so you both share the same method for organizing lists【M2】.",True,knowledge-update,yes,43.74,8,6599,1841,265,ok,
+nocturne,longmemeval-s,test,4f54b7c9,4f54b7c9,multi-session,multi-session,False,How many antique items did I inherit or acquire from my family members?,5,"You’ve mentioned five distinct antique items that came from family members:
+
+1. Antique tea set – received from your cousin Rachel [M1]  
+2. Vintage typewriter – belonged to your dad [M1]  
+3. Grandmother’s vintage diamond necklace – inherited [M5]  
+4. Antique music box – from your great‑aunt [M5]  
+5. Depression‑era glassware set – from your mom [M5]",True,default,yes,344.3,8,7655,2226,312,ok,

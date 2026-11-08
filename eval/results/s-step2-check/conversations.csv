@@ -1,0 +1,4 @@
+system,dataset,conversation_id,episodes,memory_items,memory_chars,memory_episode,memory_fact,memory_theme,sleep_cycles,facts_created,merges,supersessions,links,prep_seconds,sleep_tokens,sleep_calls,sleep_cache_hits,truncated_episodes,status,error
+nocturne,longmemeval-s,4f54b7c9,247,406,474134,247,142,17,5,147,10,5,98,891.78,186999,78,0,,ok,
+nocturne,longmemeval-s,d7c942c3,262,440,512489,262,161,17,5,169,9,8,122,993.47,204031,85,0,,ok,
+nocturne,longmemeval-s,edced276_abs,272,446,504975,272,155,19,5,159,2,4,118,836.34,197446,80,0,,ok,
