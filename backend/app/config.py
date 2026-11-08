@@ -111,9 +111,12 @@ class Settings(BaseSettings):
     sleep_stale_minutes: float = 30.0  # a "running" cycle with no heartbeat is presumed dead
     sleep_recursion_limit: int = 500  # LangGraph steps; each batch is one step
 
-    extract_batch_chars: int = 12_000
-    extract_batch_episodes: int = 25
-    judge_batch_groups: int = 12  # dedup / contradiction groups per LLM call
+    # Big batches keep a sleep cycle to a handful of calls (free tiers cap requests per day).
+    # A batch whose answer is cut off at sleep_max_tokens is split in two and retried.
+    extract_batch_chars: int = 40_000  # prompt chars per extraction call
+    extract_batch_episodes: int = 60
+    extract_assistant_chars: int = 400  # assistant reply shown to the Extractor; 0 = all
+    judge_batch_groups: int = 40  # dedup / contradiction / linker groups per LLM call
     neighbors_k: int = 4
     # Cosine-similarity thresholds (tune on a dev split; see tests/unit/test_dedup.py).
     dedup_auto_sim: float = 0.97  # ≥ this: merge without asking the LLM
@@ -131,7 +134,7 @@ class Settings(BaseSettings):
     theme_min_facts: int = 3
     theme_match_overlap: float = 0.5  # share of members for a cluster to keep its theme
     theme_max_per_cycle: int = 12  # themes (re)written per cycle; the rest wait
-    theme_batch_clusters: int = 6  # clusters per LLM call
+    theme_batch_clusters: int = 12  # clusters per LLM call
     theme_facts_shown: int = 25  # members the LLM sees per cluster
     theme_max_facts: int = 2000  # newest active facts considered for clustering
 

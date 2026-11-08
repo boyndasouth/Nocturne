@@ -7,7 +7,9 @@ provider, model, messages, temperature, max_tokens, json_mode, and provider extr
 
 Meter: counts tokens per role (answer / sleep / judge), with cache hits counted at their
 original token cost. That keeps "tokens online vs offline" comparable between a cold run
-and a cached rerun; `cache_hits` says how much was actually free.
+and a cached rerun; `cache_hits` says how much was actually free. It also counts calls per
+stage (the trace name: "extract", "dedup", ...), which is where a sleep cycle's request
+quota goes.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ import json
 import sqlite3
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -30,21 +32,43 @@ class Meter:
     cache_hits: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    stage_calls: dict[str, int] = field(default_factory=dict)
 
     @property
     def tokens(self) -> int:
         return self.input_tokens + self.output_tokens
 
     def snapshot(self) -> Meter:
-        return Meter(self.calls, self.cache_hits, self.input_tokens, self.output_tokens)
+        return Meter(
+            self.calls,
+            self.cache_hits,
+            self.input_tokens,
+            self.output_tokens,
+            dict(self.stage_calls),
+        )
 
     def __sub__(self, other: Meter) -> Meter:
+        stages = {
+            k: n - other.stage_calls.get(k, 0)
+            for k, n in self.stage_calls.items()
+            if n - other.stage_calls.get(k, 0)
+        }
         return Meter(
             self.calls - other.calls,
             self.cache_hits - other.cache_hits,
             self.input_tokens - other.input_tokens,
             self.output_tokens - other.output_tokens,
+            stages,
         )
+
+    def stages(self) -> str:
+        """'extract:5 dedup:1 contradiction:5 ...', in first-seen (pipeline) order."""
+        return " ".join(f"{k}:{n}" for k, n in self.stage_calls.items())
+
+
+def stage_of(trace_name: str) -> str:
+    """'sleep.extract' -> 'extract'; a repair round-trip keeps its suffix."""
+    return trace_name.removeprefix("sleep.").removeprefix("eval.")
 
 
 class ResponseCache:
@@ -126,7 +150,7 @@ class EvalLLM:
         if self._cache is not None:
             hit = self._cache.get(key)
             if hit is not None:
-                self._count(hit, cached=True)
+                self._count(hit, cached=True, trace_name=trace_name)
                 return hit
         resp = await self._inner.chat(
             messages,
@@ -135,12 +159,16 @@ class EvalLLM:
             json_mode=json_mode,
             trace_name=trace_name,
         )
-        if self._cache is not None and resp.text.strip():
+        # Truncated replies aren't cached: the cache doesn't keep finish_reason, and a replay
+        # must fail the same way (OutputTruncatedError) for the Extractor to split its batch.
+        if self._cache is not None and resp.text.strip() and resp.finish_reason != "length":
             self._cache.put(key, resp)
-        self._count(resp, cached=False)
+        self._count(resp, cached=False, trace_name=trace_name)
         return resp
 
-    def _count(self, resp: LLMResponse, *, cached: bool) -> None:
+    def _count(self, resp: LLMResponse, *, cached: bool, trace_name: str) -> None:
+        stage = stage_of(trace_name)
+        self.meter.stage_calls[stage] = self.meter.stage_calls.get(stage, 0) + 1
         self.meter.calls += 1
         self.meter.cache_hits += int(cached)
         self.meter.input_tokens += resp.input_tokens

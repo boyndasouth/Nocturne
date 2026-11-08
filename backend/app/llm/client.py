@@ -34,6 +34,7 @@ class LLMResponse:
     input_tokens: int
     output_tokens: int
     latency_ms: float
+    finish_reason: str | None = None  # "length" = cut off at max_tokens
 
 
 class LLMError(RuntimeError):
@@ -278,4 +279,5 @@ class OpenAICompatClient:
             input_tokens=int(usage.get("prompt_tokens") or 0),
             output_tokens=int(usage.get("completion_tokens") or 0),
             latency_ms=latency_ms,
+            finish_reason=choice.get("finish_reason"),
         )

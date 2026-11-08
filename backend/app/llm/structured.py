@@ -2,7 +2,11 @@
 
 Free-tier models occasionally wrap JSON in code fences, add a preamble, or miss a field. We
 strip the noise, validate, and on failure send the validation error back once before giving
-up with an LLMError (which fails the sleep step, so the cycle can resume later).
+up with an InvalidJSONError (which fails the sleep step, so the cycle can resume later).
+
+Output cut off at max_tokens is different: asking again would produce the same too-long
+answer, so it raises OutputTruncatedError straight away. Callers that can shrink the request
+(the Extractor halves its batch) catch InvalidJSONError and retry with less.
 """
 
 from __future__ import annotations
@@ -29,6 +33,19 @@ class Usage:
 
     def __add__(self, other: Usage) -> Usage:
         return Usage(self.tokens + other.tokens, self.calls + other.calls)
+
+
+class InvalidJSONError(LLMError):
+    """The model's reply didn't parse as the requested schema, even after a repair round.
+    `usage` is what the failed attempts cost, so callers that retry can still count it."""
+
+    def __init__(self, message: str, usage: Usage | None = None) -> None:
+        super().__init__(message)
+        self.usage = usage or Usage()
+
+
+class OutputTruncatedError(InvalidJSONError):
+    """The reply hit max_tokens mid-JSON. A smaller request is the only fix."""
 
 
 def extract_json(text: str) -> object:
@@ -68,6 +85,12 @@ async def chat_json(
             return model.model_validate(extract_json(resp.text)), usage
         except (json.JSONDecodeError, ValidationError) as exc:
             last_error = str(exc)[:1500]
+            if resp.finish_reason == "length":
+                raise OutputTruncatedError(
+                    f"{trace_name}: output cut off at max_tokens={max_tokens} "
+                    f"({resp.output_tokens} tokens)",
+                    usage,
+                ) from exc
             convo = [
                 *messages,
                 {"role": "assistant", "content": resp.text[:4000]},
@@ -77,4 +100,4 @@ async def chat_json(
                     f"{last_error}\nReply again with only the corrected JSON object.",
                 },
             ]
-    raise LLMError(f"{trace_name}: invalid JSON after repair: {last_error}")
+    raise InvalidJSONError(f"{trace_name}: invalid JSON after repair: {last_error}", usage)

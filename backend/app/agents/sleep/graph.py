@@ -5,7 +5,11 @@
 
 ⟲ = one LLM batch per step. LangGraph checkpoints after every step, so a cycle that fails
 on a rate limit resumes at the batch that failed instead of re-spending quota on the ones that
-succeeded. Every step before `apply` only reads memory; `apply` writes it in one transaction.
+succeeded. Batches are large (one extraction call holds a whole day of chat) to fit free-tier
+request quotas; an extraction batch whose answer comes back cut off or unparseable is split
+in two in the frozen plan and retried, so a big batch costs at most a few extra calls.
+
+Every step before `apply` only reads memory; `apply` writes it in one transaction.
 
 The Linker and Abstractor plan against the memory as it *will* be once this cycle applies
 (new facts in, superseded ones out), which `plan_apply` can compute before anything is
@@ -61,7 +65,7 @@ from app.agents.sleep.state import (
 from app.config import Settings
 from app.llm.client import LLMClient
 from app.llm.embeddings import Embedder, aembed_documents
-from app.llm.structured import Usage
+from app.llm.structured import InvalidJSONError, Usage
 from app.llm.tracing import Tracer
 from app.memory.cycles import CycleStore
 from app.memory.store import MemoryStore
@@ -71,9 +75,10 @@ log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class SleepConfig:
-    extract_batch_chars: int = 12_000
-    extract_batch_episodes: int = 25
-    judge_batch_groups: int = 12
+    extract_batch_chars: int = 40_000
+    extract_batch_episodes: int = 60
+    extract_assistant_chars: int = 400
+    judge_batch_groups: int = 40
     neighbors_k: int = 4
     dedup: DedupThresholds = DedupThresholds()
     conflict_sim: float = 0.65
@@ -83,7 +88,7 @@ class SleepConfig:
     link_sim: float = 0.70
     enable_abstractor: bool = True
     abstract: AbstractConfig = AbstractConfig()
-    theme_batch_clusters: int = 6
+    theme_batch_clusters: int = 12
     theme_max_facts: int = 2000
     forget: ForgetConfig = ForgetConfig()
     enable_auditor: bool = True
@@ -96,6 +101,7 @@ class SleepConfig:
         return cls(
             extract_batch_chars=s.extract_batch_chars,
             extract_batch_episodes=s.extract_batch_episodes,
+            extract_assistant_chars=s.extract_assistant_chars,
             judge_batch_groups=s.judge_batch_groups,
             neighbors_k=s.neighbors_k,
             dedup=DedupThresholds(auto=s.dedup_auto_sim, judge=s.dedup_judge_sim),
@@ -189,14 +195,37 @@ def build_sleep_graph(
         plan: list[list[int]] = state.get("extract_plan") or [  # type: ignore[assignment]
             [episodes.index(e) for e in batch]
             for batch in batch_episodes(
-                episodes, max_chars=cfg.extract_batch_chars, max_items=cfg.extract_batch_episodes
+                episodes,
+                max_chars=cfg.extract_batch_chars,
+                max_items=cfg.extract_batch_episodes,
+                assistant_chars=cfg.extract_assistant_chars,
             )
         ]
         cursor = state.get("extract_cursor", 0)
         if cursor >= len(plan):
             return {"extract_plan": plan, "extract_cursor": cursor}
         batch = [episodes[i] for i in plan[cursor]]
-        new, usage = await extract_batch(deps.llm, batch, cursor, max_tokens=cfg.max_tokens)
+        try:
+            new, usage = await extract_batch(
+                deps.llm,
+                batch,
+                cursor,
+                max_tokens=cfg.max_tokens,
+                assistant_chars=cfg.extract_assistant_chars,
+            )
+        except InvalidJSONError as exc:
+            if len(plan[cursor]) < 2:
+                raise
+            # Too much for one answer: halve this batch and retry. Later batches shift right,
+            # but none of them has produced candidates yet, so candidate keys stay unique.
+            log.warning("extract batch %d (%d episodes) split: %s", cursor, len(batch), exc)
+            half = (len(plan[cursor]) + 1) // 2
+            split = [plan[cursor][:half], plan[cursor][half:]]
+            return {
+                "extract_plan": [*plan[:cursor], *split, *plan[cursor + 1 :]],
+                "extract_cursor": cursor,
+                **_usage(state, exc.usage),
+            }
         return {
             "extract_plan": plan,
             "extract_cursor": cursor + 1,

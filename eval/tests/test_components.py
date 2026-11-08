@@ -121,6 +121,37 @@ async def test_cache_key_includes_provider_extras(tmp_path):
     assert high.meter.cache_hits == 0
 
 
+async def test_meter_counts_calls_per_stage_and_snapshots_subtract(tmp_path):
+    llm = EvalLLM(CountingLLM(), cache=ResponseCache(tmp_path / "c.sqlite"))
+    await llm.chat([{"role": "user", "content": "a"}], trace_name="sleep.extract")
+    before = llm.meter.snapshot()
+    for name in ("sleep.extract", "sleep.extract", "sleep.dedup", "sleep.extract.repair"):
+        await llm.chat([{"role": "user", "content": name + str(llm.meter.calls)}], trace_name=name)
+    used = llm.meter.snapshot() - before
+    assert used.calls == 4
+    assert used.stages() == "extract:2 dedup:1 extract.repair:1"
+    assert before.stages() == "extract:1"  # the snapshot didn't move
+
+
+class TruncatingLLM(CountingLLM):
+    async def chat(self, messages, **_):
+        self.calls += 1
+        return LLMResponse(
+            text='{"facts": [', model="m", input_tokens=10, output_tokens=2, latency_ms=5.0,
+            finish_reason="length",
+        )  # fmt: skip
+
+
+async def test_truncated_replies_are_not_cached(tmp_path):
+    """A replay must see the truncation again (the cache drops finish_reason)."""
+    inner = TruncatingLLM()
+    llm = EvalLLM(inner, cache=ResponseCache(tmp_path / "c.sqlite"))
+    msgs = [{"role": "user", "content": "hi"}]
+    await llm.chat(msgs)
+    again = await llm.chat(msgs)
+    assert inner.calls == 2 and again.finish_reason == "length"
+
+
 # --- Baselines ------------------------------------------------------------------------------
 
 

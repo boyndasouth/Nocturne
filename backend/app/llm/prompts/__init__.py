@@ -54,7 +54,8 @@ Friday" said on 2026-03-02 becomes "The user's exam is on 2026-03-06."
 What to extract:
 - From chat turns, extract only what the USER stated: facts about themselves, their plans, \
 preferences, beliefs, deadlines, and course material they shared. Assistant replies are \
-context for understanding the user's words, never a source of facts.
+context for understanding the user's words, never a source of facts. Long assistant \
+replies are shortened (they end in "…").
 - From ingested notes, extract the key claims, definitions, and results.
 - Skip greetings, small talk, questions without information, and anything only true for a \
 moment ("the user is typing").
