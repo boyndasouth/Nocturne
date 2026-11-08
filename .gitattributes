@@ -1,0 +1,2 @@
+# Keep text files LF on every machine (ruff and CI expect consistent line endings).
+* text=auto eol=lf
