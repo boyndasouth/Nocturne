@@ -1,8 +1,11 @@
 """Naive RAG baseline: one chunk per raw turn, top-k by cosine similarity, nothing else.
 
 No keyword search, no strength or recency, no consolidation, and no database: an in-memory
-matrix with the same embedder as Nocturne. The gap between this and nocturne-no-sleep is
-what hybrid search and scoring buy; the gap to nocturne is what sleep buys.
+matrix with the same embedder as Nocturne. Its context gets the same character budget and
+excerpting as Nocturne's Responder (app/memory/excerpt.py), so the systems differ in what
+they retrieve, not in how much text the answer model reads. The gap between this and
+nocturne-no-sleep is what hybrid search and scoring buy; the gap to nocturne is what sleep
+buys.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ import numpy as np
 
 from app.llm.client import LLMClient
 from app.llm.embeddings import Embedder, aembed_documents, aembed_query
+from app.memory.excerpt import fit
 from eval.base import PrepStats, SystemAnswer, answer_with_context
 from eval.datasets.schema import Conversation, Episode, Question
 
@@ -36,8 +40,12 @@ class NaiveRagSystem:
         embedder: Embedder,
         top_k: int,
         max_tokens: int,
+        budget_chars: int = 12_000,
+        item_max_chars: int = 3_000,
         name: str = "naive-rag",
     ) -> None:
+        self._budget = budget_chars
+        self._item_max = item_max_chars
         self.name = name
         self._llm = answer_llm
         self._embedder = embedder
@@ -67,10 +75,15 @@ class NaiveRagSystem:
         hits = [visible[i] for i in top_k(self._matrix[visible], qvec, self._k)]
         retrieval_ms = (time.perf_counter() - t0) * 1000
 
-        lines = [
-            f"[M{n}] ({self._chunks[i].at:%Y-%m-%d %H:%M} UTC) {self._chunks[i].content}"
-            for n, i in enumerate(hits, start=1)
-        ]
+        labels = [f"[M{n}] ({self._chunks[i].at:%Y-%m-%d %H:%M} UTC)" for n, i in
+                  enumerate(hits, start=1)]  # fmt: skip
+        texts = fit(
+            [self._chunks[i].content for i in hits],
+            q.question,
+            budget=max(0, self._budget - sum(len(lb) + 2 for lb in labels)),
+            item_max=self._item_max,
+        )
+        lines = [f"{lb} {t}" for lb, t in zip(labels, texts, strict=True)]
         context = (
             "Relevant memories (most relevant first):\n" + "\n".join(lines)
             if lines

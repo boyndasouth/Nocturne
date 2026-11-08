@@ -91,6 +91,8 @@ def create_app(
             recent_turns=settings.recent_turns,
             reinforce_eta=settings.reinforce_eta,
             reinforce_kappa=settings.reinforce_kappa,
+            context_budget_chars=settings.context_budget_chars,
+            context_item_max_chars=settings.context_item_max_chars,
             max_tokens=settings.online_max_tokens,
         )
         cycles = CycleStore(pool)

@@ -71,6 +71,8 @@ class RetrievalConfig:
     temporal: bool = True
     temporal_weight: float = 0.15  # added when a note's valid time overlaps the window
     fallback_min_score: float = 0.45  # below this best score, search archived episodes too
+    fact_slots: int = 3  # top_k slots reserved for facts that score >= ratio x the best
+    fact_slot_ratio: float = 0.6
 
 
 @dataclass
@@ -89,6 +91,29 @@ def overlaps_window(note_tier: Tier, valid_from: datetime, valid_to: datetime | 
     if note_tier is Tier.EPISODE:  # an episode is a moment: when it was said
         return window.start <= valid_from < window.end
     return window.overlaps(valid_from, valid_to)
+
+
+def reserve_fact_slots(
+    ranked: Sequence[ScoredNote], *, k: int, slots: int, ratio: float
+) -> list[ScoredNote]:
+    """The top k of `ranked` (best first), except that up to `slots` of them go to facts
+    when the top k has fewer: good-enough facts (score >= ratio x the best) from further
+    down replace the lowest-ranked turns. Long raw turns can otherwise fill every slot,
+    leaving out the facts sleep distilled from turns that weren't retrieved."""
+    top = list(ranked[:k])
+    have = sum(1 for s in top if s.note.tier is Tier.FACT)
+    if have >= slots or not top:
+        return top
+    floor = ratio * top[0].score
+    extra = [s for s in ranked[k:] if s.note.tier is Tier.FACT and s.score >= floor]
+    extra = extra[: slots - have]
+    for fact in extra:
+        for i in range(len(top) - 1, -1, -1):  # drop the lowest-ranked turn
+            if top[i].note.tier is Tier.EPISODE:
+                top[i] = fact
+                break
+    top.sort(key=lambda s: (-s.score, -s.note.valid_from.timestamp(), str(s.note.id)))
+    return top
 
 
 class HierarchicalRetriever:
@@ -227,7 +252,12 @@ class HierarchicalRetriever:
                 result.append(h.scored.model_copy(update={"score": h.base + boost, "via": via}))
             result.sort(key=lambda s: (-s.score, -s.note.valid_from.timestamp(), str(s.note.id)))
             themes = [s for s in result if s.note.tier is Tier.THEME][: cfg.theme_k]
-            rest = [s for s in result if s.note.tier is not Tier.THEME][:k]
+            rest = reserve_fact_slots(
+                [s for s in result if s.note.tier is not Tier.THEME],
+                k=k,
+                slots=cfg.fact_slots,
+                ratio=cfg.fact_slot_ratio,
+            )
             ranked = themes + rest
 
             obs.update(

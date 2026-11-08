@@ -74,6 +74,13 @@ class Settings(BaseSettings):
     retrieval_temporal: bool = True  # parse "in March", "last week", ... into a time window
     retrieval_temporal_weight: float = 0.15
     retrieval_fallback_min_score: float = 0.45  # weaker best match -> search archived turns
+    # At least this many of the top_k slots go to facts, when there are facts scoring at
+    # least `ratio` x the best result (so a question can't be answered from raw turns alone).
+    retrieval_fact_slots: int = 3
+    retrieval_fact_slot_ratio: float = 0.6
+    # Memory block given to the answer model; the eval's naive-RAG baseline gets the same.
+    context_budget_chars: int = 12_000
+    context_item_max_chars: int = 3_000
     recent_turns: int = 4
     score_alpha: float = 0.6
     score_beta: float = 0.2
@@ -142,6 +149,8 @@ class Settings(BaseSettings):
             temporal=self.retrieval_temporal,
             temporal_weight=self.retrieval_temporal_weight,
             fallback_min_score=self.retrieval_fallback_min_score,
+            fact_slots=self.retrieval_fact_slots,
+            fact_slot_ratio=self.retrieval_fact_slot_ratio,
         )
 
     @property

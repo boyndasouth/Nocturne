@@ -169,6 +169,8 @@ def build_systems(
                     embedder=clients.embedder,
                     top_k=s.retrieval_top_k,
                     max_tokens=s.online_max_tokens,
+                    budget_chars=s.context_budget_chars,
+                    item_max_chars=s.context_item_max_chars,
                 )
             )
         elif name in NOCTURNE_SYSTEMS:
@@ -246,6 +248,10 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
                 "retrieval_temporal",
                 "retrieval_temporal_weight",
                 "retrieval_fallback_min_score",
+                "retrieval_fact_slots",
+                "retrieval_fact_slot_ratio",
+                "context_budget_chars",
+                "context_item_max_chars",
                 "retrieval_candidate_pool",
                 "recent_turns",
                 "score_alpha",

@@ -40,9 +40,29 @@ def test_memory_context_when_empty():
     assert refmap == {} and "no memories" in text
 
 
-def test_memory_context_truncates_long_notes():
-    text, _ = build_memory_context([scored(note("x" * 5000))], [])
-    assert len(text) < 1000 and text.endswith("…")
+def test_memory_context_caps_one_long_note_at_the_item_max():
+    text, _ = build_memory_context([scored(note("x" * 5000))], [], item_max_chars=3000)
+    assert 3000 < len(text) < 3200 and text.endswith("…")
+
+
+def test_memory_context_shares_the_budget_and_keeps_the_matching_passage():
+    long_turn = (
+        "User: Let's keep playing chess.\nAssistant: "
+        + " ".join(f"Move {i} was quiet." for i in range(60))
+        + " After 27. Kg2 Bd5+ I played 28. Kg3."
+        + " The rest was routine." * 20
+    )
+    short = note("The user likes chess.")
+    text, _ = build_memory_context(
+        [scored(note(long_turn)), scored(short)],
+        [],
+        query="What move did you make after 27. Kg2 Bd5+?",
+        budget_chars=700,
+    )
+    assert len(text) < 900
+    assert "User: Let's keep playing chess." in text  # the user's line is kept
+    assert "28. Kg3" in text  # the matching passage, not just the beginning
+    assert "The user likes chess." in text  # short notes keep their full text
 
 
 def test_extract_citations_keeps_order_dedupes_and_drops_hallucinated_refs():
