@@ -146,6 +146,89 @@ a single request at its 8K tokens-per-minute limit, so on long histories it's a 
 history" baseline rather than an upper bound (`truncated_episodes` says how much it dropped).
 On LoCoMo, a two-person dialogue, the extractor still assumes a user/assistant chat.
 
+## Results (Phase 3)
+
+Small-sample results from the Phase 3 exit check. They show the system working end to end
+under a fair comparison; they are **not** large enough to rank the systems. With 10
+questions one answer moves accuracy by 10 points, and an 80% score is consistent with
+anything from about 50% to 95%.
+
+**Setup.** Every system answers with the same model and prompt: Groq `openai/gpt-oss-120b`.
+Sleep runs on Gemini 3.5 Flash-Lite, and the judge is Groq `openai/gpt-oss-20b` using
+LongMemEval's official prompts. Embeddings are local `bge-small-en-v1.5`. Naive RAG and both
+Nocturne systems read the same 12,000-character context budget, with query-aware excerpts.
+Full context is capped at 5,000 tokens (Groq free tier), so on long histories it only sees
+recent turns: a floor, not an upper bound.
+
+### LongMemEval oracle: 30 questions (evidence sessions only, sleep after every session)
+
+| Category | full-context | naive-rag | nocturne-no-sleep | nocturne |
+|---|---|---|---|---|
+| abstention | 5/5 | 5/5 | 5/5 | 5/5 |
+| knowledge-update | 5/5 | 5/5 | 5/5 | 5/5 |
+| multi-session | 1/4 | 4/4 | 4/4 | 4/4 |
+| single-session-assistant | 4/4 | 4/4 | 4/4 | 4/4 |
+| single-session-preference | 0/4 | 2/4 | 2/4 | 2/4 |
+| single-session-user | 4/4 | 4/4 | 4/4 | 4/4 |
+| temporal-reasoning | 2/4 | 2/4 | 2/4 | 2/4 |
+| **overall** | **70%** | **87%** | **87%** | **87%** |
+
+Histories of 1–3 short sessions give sleep nothing to consolidate, so the memory systems
+tie. The run confirms nothing breaks; it can't show what sleep adds.
+
+### LongMemEval-S: 10 questions (~50 sessions, ~250 turns each; sleep every 10 sessions)
+
+| Category | full-context | naive-rag | nocturne-no-sleep | nocturne |
+|---|---|---|---|---|
+| abstention | 2/2 | 2/2 | 2/2 | 2/2 |
+| knowledge-update | 0/2 | 2/2 | 2/2 | 2/2 |
+| multi-session | 0/2 | 1/2 | 1/2 | 1/2 |
+| single-session-assistant | 0/1 | 1/1 | 1/1 | 1/1 |
+| single-session-preference | 0/1 | 1/1 | 1/1 | 0/1 |
+| single-session-user | 0/1 | 1/1 | 1/1 | 1/1 |
+| temporal-reasoning | 0/1 | 0/1 | 0/1 | 0/1 |
+| **overall** | **20%** | **80%** | **80%** | **70%** |
+
+| | naive-rag | nocturne-no-sleep | nocturne |
+|---|---|---|---|
+| Online answer tokens (10 q) | 30.4K | 32.2K | 32.0K |
+| Offline sleep tokens (10 q) | – | – | 2.04M |
+| Retrieval p50 / p95 | 65 / 136 ms | 30 / 173 ms | 56 / 109 ms |
+| Memory items per raw turn | 1.00 | 1.00 | 1.55 |
+| Auditor score (self-graded) | – | – | 0.90 |
+
+**What this shows**
+- Sleep builds real structure: about 150 facts, 17 themes and 100+ typed links per
+  ~250-turn history. The themes have specific subjects ("Tokyo apartment relocation",
+  "Friend's baby shower planning") and 3–10 facts each.
+- With equal context, Nocturne is within one question of both baselines. Its one extra
+  miss is a preference question: it recalled more about the user (a 40-minute bike commute,
+  podcasts they already listen to), but its answer suggested a genre the user wanted to
+  move away from. The retrieval worked; the answer misused one detail.
+- Excerpting matters. Before the context budget was equalised, Nocturne cut every memory
+  at 600 characters and lost answers buried in long replies (a chess move); the fix
+  recovered them.
+
+**What it doesn't show (yet)**
+- Whether sleep improves accuracy. That needs a few hundred questions, which needs sleep to
+  be cheaper first: it costs ~200K tokens (~80 Gemini calls) per LongMemEval-S question,
+  against a free tier of ~500 calls a day.
+- That memory grows sub-linearly. The Forgetter only archives turns untouched for ~30
+  days, and these histories are mostly shorter than that, so memory is 1.55× the raw log.
+- An unbiased audit: the Auditor is the same model that made the decisions.
+
+**Judge reliability.** On a 20-answer random sample, hand labels agreed with the judge on
+20/20. The two preference answers in the sample were borderline: generic advice with one
+personal detail, which the official rubric accepts.
+
+Reproduce (the runs resume after quota limits, and cached calls are free):
+
+```powershell
+python eval/run_eval.py --limit 30 --run-name oracle-phase3
+$env:EVAL_SLEEP_EVERY_SESSIONS = "10"
+python eval/run_eval.py --dataset longmemeval-s --limit 10 --run-name s-phase3-fair
+```
+
 ## Tests
 
 Works from the repo root or `backend\`; from the root it also runs the eval harness tests.
