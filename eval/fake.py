@@ -16,6 +16,7 @@ from app.llm.prompts import (
     CONTRADICTION_SYSTEM,
     DEDUP_SYSTEM,
     EXTRACTOR_SYSTEM,
+    EXTRACTOR_SYSTEM_UNTRIMMED,
     LINKER_SYSTEM,
     RESPONDER_SYSTEM,
 )
@@ -55,7 +56,7 @@ class FakeLLM:
     def _reply(self, messages: Sequence[ChatMessage]) -> str:
         system = messages[0]["content"] if messages[0]["role"] == "system" else ""
         user = messages[-1]["content"]
-        if system == EXTRACTOR_SYSTEM:
+        if system in (EXTRACTOR_SYSTEM, EXTRACTOR_SYSTEM_UNTRIMMED):
             facts = []
             for n, body in _EPISODE_RE.findall(user):
                 first = body.strip().splitlines()[0] if body.strip() else ""

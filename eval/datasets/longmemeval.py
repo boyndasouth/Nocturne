@@ -58,7 +58,12 @@ def parse_instance(item: dict[str, Any]) -> Conversation:
             id=str(sid),
             date=parse_date(date),
             turns=tuple(
-                Turn(speaker=str(t["role"]), text=str(t.get("content") or "")) for t in turns
+                Turn(
+                    speaker=str(t["role"]),
+                    text=str(t.get("content") or ""),
+                    evidence=bool(t.get("has_answer")),
+                )
+                for t in turns
             ),
         )
         for sid, date, turns in zip(

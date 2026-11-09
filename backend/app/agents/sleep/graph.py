@@ -487,7 +487,10 @@ def build_sleep_graph(
         cycle_id = UUID(state["cycle_id"])
         try:
             items = await _audit_items(state)
-            picked = sample_items(items, n=cfg.audit_sample, seed=str(cycle_id))
+            # Seeded by the decisions, not the cycle id, so an eval rerun draws the same
+            # sample and replays from the LLM cache.
+            seed = "\n".join(sorted(f"{it.kind}:{it.text}" for it in items))
+            picked = sample_items(items, n=cfg.audit_sample, seed=seed)
             if not picked:
                 return {}
             result, usage = await audit(deps.llm, picked, max_tokens=cfg.max_tokens)

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.agents.sleep.state import EpisodeIn, FactCandidate
 from app.llm.client import LLMClient
-from app.llm.prompts import EXTRACTOR_SYSTEM, EXTRACTOR_USER
+from app.llm.prompts import EXTRACTOR_SYSTEM, EXTRACTOR_SYSTEM_UNTRIMMED, EXTRACTOR_USER
 from app.llm.structured import Usage, chat_json
 
 MAX_FACT_CHARS = 500
@@ -55,6 +55,15 @@ def _clip(text: str, limit: int) -> str:
     return cut.rstrip() + " …"
 
 
+def _trim_assistant(content: str, assistant_chars: int) -> str:
+    if assistant_chars <= 0:
+        return content
+    if content.startswith(ASSISTANT_PREFIX):
+        return ASSISTANT_PREFIX + _clip(content[len(ASSISTANT_PREFIX) :], assistant_chars)
+    user, sep, reply = content.partition(ASSISTANT_MARKER)
+    return user + sep + _clip(reply, assistant_chars) if sep else content
+
+
 def episode_text(content: str, *, assistant_chars: int = 0) -> str:
     """What the extractor sees of one episode.
 
@@ -62,27 +71,33 @@ def episode_text(content: str, *, assistant_chars: int = 0) -> str:
     to make the user's words understandable ("I'll take the second one"). On chat benchmarks
     the replies are ~85% of the text, so `assistant_chars` > 0 keeps just their opening. The
     stored episode is untouched: retrieval and the Responder still see the full reply.
-    Episodes without an "Assistant:" part (notes, dialogue) are only capped in length."""
+    Episodes without an "Assistant:" part (notes, dialogue) are only capped in length.
+
+    Trimming off reproduces Phase 3's prompt text byte for byte, and trimming on reproduces
+    Phase 4.1's, so runs made with either replay from the LLM cache."""
+    text = _trim_assistant(content, assistant_chars)
     if assistant_chars > 0:
-        if content.startswith(ASSISTANT_PREFIX):
-            content = ASSISTANT_PREFIX + _clip(content[len(ASSISTANT_PREFIX) :], assistant_chars)
-        else:
-            user, sep, reply = content.partition(ASSISTANT_MARKER)
-            if sep:
-                content = user + sep + _clip(reply, assistant_chars)
-    return _clip(content, _EPISODE_PREVIEW_CHARS)
+        return _clip(text, _EPISODE_PREVIEW_CHARS)
+    if len(text) > _EPISODE_PREVIEW_CHARS:
+        text = text[:_EPISODE_PREVIEW_CHARS].rstrip() + " …"
+    return text
 
 
 def batch_episodes(
     episodes: Sequence[EpisodeIn], *, max_chars: int, max_items: int, assistant_chars: int = 0
 ) -> list[list[EpisodeIn]]:
-    """Consecutive batches under both limits, measured on the text the prompt will hold. An
-    oversized episode gets a batch to itself (and is truncated in the prompt)."""
+    """Consecutive batches under both limits, measured on the text the prompt will hold
+    (Phase 3, untrimmed: on the raw text capped at the preview size). An oversized episode
+    gets a batch to itself (and is truncated in the prompt)."""
     batches: list[list[EpisodeIn]] = []
     current: list[EpisodeIn] = []
     size = 0
     for ep in episodes:
-        n = len(episode_text(ep.content, assistant_chars=assistant_chars))
+        n = (
+            len(episode_text(ep.content, assistant_chars=assistant_chars))
+            if assistant_chars > 0
+            else min(len(ep.content), _EPISODE_PREVIEW_CHARS)
+        )
         if current and (size + n > max_chars or len(current) >= max_items):
             batches.append(current)
             current, size = [], 0
@@ -158,7 +173,10 @@ async def extract_batch(
     output, usage = await chat_json(
         llm,
         [
-            {"role": "system", "content": EXTRACTOR_SYSTEM},
+            {
+                "role": "system",
+                "content": EXTRACTOR_SYSTEM if assistant_chars > 0 else EXTRACTOR_SYSTEM_UNTRIMMED,
+            },
             {
                 "role": "user",
                 "content": EXTRACTOR_USER.format(

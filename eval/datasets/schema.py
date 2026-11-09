@@ -24,6 +24,7 @@ Style = Literal["chat", "dialogue"]
 class Turn:
     speaker: str  # "user" / "assistant" for chat; the person's name for dialogue
     text: str
+    evidence: bool = False  # the benchmark marks this turn as holding (part of) an answer
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,9 @@ class Episode:
     session_id: str
     content: str
     at: datetime
+    # The user's turn (chat) or the utterance (dialogue) is marked as evidence. Evidence in
+    # an assistant reply doesn't count: the Extractor never takes facts from replies.
+    evidence: bool = False
 
 
 @dataclass(frozen=True)
@@ -71,8 +75,8 @@ class Conversation:
         for s in self.sessions:
             texts = _chat_pairs(s.turns) if self.style == "chat" else _utterances(s.turns)
             out.extend(
-                Episode(session_id=s.id, content=t, at=s.date + i * TURN_SPACING)
-                for i, t in enumerate(texts)
+                Episode(session_id=s.id, content=t, at=s.date + i * TURN_SPACING, evidence=ev)
+                for i, (t, ev) in enumerate(texts)
             )
         return out
 
@@ -84,28 +88,29 @@ class Conversation:
         return [ends[s.id] for s in self.sessions if s.id in ends]
 
 
-def _chat_pairs(turns: tuple[Turn, ...]) -> list[str]:
-    texts: list[str] = []
-    user: str | None = None
+def _chat_pairs(turns: tuple[Turn, ...]) -> list[tuple[str, bool]]:
+    """(episode text, user turn is evidence) per user turn + the replies that follow."""
+    texts: list[tuple[str, bool]] = []
+    user: Turn | None = None
     assistant: list[str] = []
 
     def flush() -> None:
         if user is not None:
-            texts.append(format_turn(user, "\n".join(assistant) or None))
+            texts.append((format_turn(user.text, "\n".join(assistant) or None), user.evidence))
         elif assistant:  # an assistant turn with no user turn before it
-            texts.append("Assistant: " + "\n".join(assistant))
+            texts.append(("Assistant: " + "\n".join(assistant), False))
 
     for t in turns:
         if not t.text.strip():
             continue
         if t.speaker == "user":
             flush()
-            user, assistant = t.text, []
+            user, assistant = t, []
         else:
             assistant.append(t.text.strip())
     flush()
     return texts
 
 
-def _utterances(turns: tuple[Turn, ...]) -> list[str]:
-    return [f"{t.speaker}: {t.text.strip()}" for t in turns if t.text.strip()]
+def _utterances(turns: tuple[Turn, ...]) -> list[tuple[str, bool]]:
+    return [(f"{t.speaker}: {t.text.strip()}", t.evidence) for t in turns if t.text.strip()]

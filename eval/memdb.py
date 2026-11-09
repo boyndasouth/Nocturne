@@ -7,6 +7,9 @@ is why the database name must contain "eval" or "test": never point this at real
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from uuid import UUID
+
 import psycopg
 from psycopg_pool import AsyncConnectionPool
 
@@ -44,6 +47,22 @@ class EvalDatabase:
     async def reset(self) -> None:
         async with self._pool.connection() as conn:
             await conn.execute(f"truncate {_TABLES} restart identity cascade")
+
+    async def covered(self, episode_ids: Sequence[UUID]) -> int:
+        """How many of these episodes are a source of at least one fact. Superseded and
+        archived facts count: the question is whether extraction captured the episode."""
+        if not episode_ids:
+            return 0
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                "select count(distinct e) as n from memory_notes,"
+                " unnest(source_episode_ids) as e"
+                " where tier = 'fact' and e = any(%s)",
+                (list(episode_ids),),
+            )
+            row = await cur.fetchone()
+        assert row is not None
+        return int(row["n"])
 
     async def stats(self) -> PrepStats:
         async with self._pool.connection() as conn:

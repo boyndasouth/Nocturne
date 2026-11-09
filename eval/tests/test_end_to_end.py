@@ -76,12 +76,17 @@ def test_fake_run_produces_results_for_every_system_and_resumes(eval_env):
     assert int(slept["sleep_cycles"]) == 2  # one per session
     assert int(slept["memory_fact"]) > 0 and int(slept["sleep_tokens"]) > 0
     assert slept["audit_score"] == ""  # nothing merged, linked or themed: nothing to audit
+    # The fake Extractor turns every user turn into a fact, so the one evidence turn is covered.
+    assert (slept["evidence_episodes"], slept["evidence_covered"]) == ("1", "1")
     awake = convs[("nocturne-no-sleep", "ku_001")]
     assert (awake["memory_fact"], awake["sleep_tokens"]) == ("0", "0")
+    assert awake["evidence_episodes"] == ""  # no sleep, nothing to measure
 
     totals = {t["system"]: t for t in _csv(run / "totals.csv")}
     assert totals["naive-rag"]["retrieval_p95_ms"] != ""
     assert totals["full-context"]["retrieval_p95_ms"] == ""
+    assert float(totals["nocturne"]["evidence_coverage"]) == 1.0
+    assert totals["nocturne-no-sleep"]["evidence_coverage"] == ""
 
     lines_before = (run / "questions.jsonl").read_text().count("\n")
     assert main(ARGS) == 0  # resume: nothing left to do

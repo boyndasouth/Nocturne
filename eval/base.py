@@ -28,6 +28,10 @@ class PrepStats:
     archived: int = 0  # notes the Forgetter (and Abstractor) archived
     audit_score: float | None = None  # mean Auditor score over this memory's cycles
     audit_items: int = 0
+    # Extraction recall: episodes the benchmark marks as holding an answer, and how many of
+    # them are a source of at least one fact (any status). Sleeping systems only.
+    evidence_episodes: int = 0
+    evidence_covered: int = 0
     seconds: float = 0.0
 
 

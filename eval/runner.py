@@ -457,6 +457,10 @@ async def run(
                         "archived": prep.archived,
                         "audit_score": prep.audit_score,
                         "audit_items": prep.audit_items,
+                        "evidence_episodes": prep.evidence_episodes or None,
+                        "evidence_covered": prep.evidence_covered
+                        if prep.evidence_episodes
+                        else None,
                         "prep_seconds": round(prep.seconds, 2),
                         "sleep_tokens": sleep_used.tokens,
                         "sleep_calls": sleep_used.calls,

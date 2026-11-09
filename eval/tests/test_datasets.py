@@ -55,6 +55,32 @@ def test_chat_episodes_pair_user_with_reply_in_order(lme):
     assert lme["ku_001"].session_ends() == [eps[1].at, eps[2].at]
 
 
+def test_has_answer_marks_evidence_episodes_by_the_user_turn(lme):
+    assert [e.evidence for e in lme["ku_001"].episodes()] == [False, False, True]
+    assert [e.evidence for e in lme["tr_002"].episodes()] == [True, True]
+    assert not any(e.evidence for e in lme["ssu_003_abs"].episodes())
+
+    # An answer that only the assistant gave isn't extractable, so it isn't counted.
+    conv = longmemeval.parse_instance(
+        {
+            "question_id": "ssa_1",
+            "question_type": "single-session-assistant",
+            "question": "Which cafe did you suggest?",
+            "answer": "Cafe Uno",
+            "question_date": "2023/05/21 (Sun) 10:00",
+            "haystack_session_ids": ["s1"],
+            "haystack_dates": ["2023/05/20 (Sat) 09:00"],
+            "haystack_sessions": [
+                [
+                    {"role": "user", "content": "Any cafe tips?"},
+                    {"role": "assistant", "content": "Try Cafe Uno.", "has_answer": True},
+                ]
+            ],
+        }
+    )
+    assert [e.evidence for e in conv.episodes()] == [False]
+
+
 LOCOMO_SAMPLE = {
     "sample_id": "conv-x",
     "conversation": {

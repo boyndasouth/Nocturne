@@ -158,7 +158,7 @@ class NocturneSystem:
         await self._db.reset()
         episodes = conv.episodes()
         vecs = await aembed_documents(self._embedder, [e.content for e in episodes])
-        await self._store.insert_notes(
+        notes = await self._store.insert_notes(
             [
                 NewNote(
                     tier=Tier.EPISODE,
@@ -177,6 +177,10 @@ class NocturneSystem:
                     pass
         stats = await self._db.stats()
         stats.episodes = len(episodes)
+        if self._runner is not None:
+            evidence = [n.id for n, e in zip(notes, episodes, strict=True) if e.evidence]
+            stats.evidence_episodes = len(evidence)
+            stats.evidence_covered = await self._db.covered(evidence)
         stats.seconds = time.perf_counter() - t0
         return stats
 

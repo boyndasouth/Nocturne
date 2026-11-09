@@ -76,6 +76,14 @@ Episodes (oldest first):
 
 {episodes}"""
 
+# With EXTRACT_ASSISTANT_CHARS=0 the Extractor sends the Phase 3 prompt byte for byte, so
+# Phase 3 runs replay from the LLM cache (tests/unit/test_prompt_compat.py guards this).
+EXTRACTOR_SYSTEM_UNTRIMMED = EXTRACTOR_SYSTEM.replace(
+    """ Long assistant \
+replies are shortened (they end in "…").""",
+    "",
+)
+
 DEDUP_SYSTEM = """\
 You deduplicate a long-term memory. Each group has a NEW fact and some EXISTING facts that \
 look similar.

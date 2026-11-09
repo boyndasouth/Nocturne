@@ -63,6 +63,8 @@ CONVERSATION_FIELDS = (
     "archived",
     "audit_score",
     "audit_items",
+    "evidence_episodes",
+    "evidence_covered",
     "prep_seconds",
     "sleep_tokens",
     "sleep_calls",
@@ -89,6 +91,7 @@ TOTALS_FIELDS = (
     "mean_episodes",
     "memory_ratio",
     "audit_score",
+    "evidence_coverage",
 )
 
 
@@ -181,9 +184,17 @@ def summarize(
                 "memory_ratio": round(items / episodes, 3) if episodes else None,
                 # Auditor quality (spec §9), weighted by how many verdicts each memory got.
                 "audit_score": _weighted_audit(convs),
+                # Share of answer-holding episodes that became a source of some fact.
+                "evidence_coverage": _coverage(convs),
             }
         )
     return summary, totals
+
+
+def _coverage(convs: Sequence[dict[str, Any]]) -> float | None:
+    marked = sum(int(c.get("evidence_episodes") or 0) for c in convs)
+    covered = sum(int(c.get("evidence_covered") or 0) for c in convs)
+    return round(covered / marked, 4) if marked else None
 
 
 def _weighted_audit(convs: Sequence[dict[str, Any]]) -> float | None:
@@ -213,7 +224,7 @@ def format_table(summary: Sequence[dict[str, Any]], totals: Sequence[dict[str, A
     systems = [t["system"] for t in totals]
     cats = sorted({s["category"] for s in summary})
     acc = {(s["system"], s["category"]): s for s in summary}
-    width = max([len(c) for c in cats] + [len("task-averaged"), 8])
+    width = max([len(c) for c in cats] + [len("evidence coverage"), 8])
     col = max([len(s) for s in systems] + [10])
     lines = [" " * width + "  " + "  ".join(s.rjust(col) for s in systems)]
 
@@ -224,7 +235,10 @@ def format_table(summary: Sequence[dict[str, Any]], totals: Sequence[dict[str, A
         lines.append(
             c.ljust(width) + "  " + "  ".join(cell(acc.get((s, c))).rjust(col) for s in systems)
         )
-    for label, key in (("overall", "accuracy"), ("task-averaged", "task_avg_accuracy")):
+    keys = [("overall", "accuracy"), ("task-averaged", "task_avg_accuracy")]
+    if any(t.get("evidence_coverage") is not None for t in totals):
+        keys.append(("evidence coverage", "evidence_coverage"))
+    for label, key in keys:
         vals = [t[key] for t in totals]
         lines.append(
             label.ljust(width)
