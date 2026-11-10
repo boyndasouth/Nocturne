@@ -267,6 +267,7 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
                 "extract_batch_chars",
                 "extract_batch_episodes",
                 "extract_assistant_chars",
+                "extract_prompt",
                 "judge_batch_groups",
                 "neighbors_k",
                 "dedup_auto_sim",
@@ -296,14 +297,28 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
     }
 
 
+# Backend settings added to the fingerprint after runs were made, with the value those
+# older runs implicitly used. A run made before the key existed resumes only if the
+# current value is the same.
+ADDED_BACKEND_KEYS: dict[str, Any] = {"extract_assistant_chars": 0, "extract_prompt": "v1"}
+
+
+def _flatten(fp: dict) -> dict:
+    flat = {k: v for k, v in fp.items() if k != "backend"}
+    backend = {**ADDED_BACKEND_KEYS, **(fp.get("backend") or {})}
+    flat.update({f"backend.{k}": v for k, v in backend.items()})
+    return flat
+
+
 def check_config(run_dir: Path, fingerprint: dict, *, allow_change: bool) -> None:
     path = run_dir / "config.json"
     if path.exists():
         old = json.loads(path.read_text(encoding="utf-8")).get("fingerprint")
-        if old is not None and old != fingerprint and not allow_change:
-            changed = sorted(
-                k for k in set(old) | set(fingerprint) if old.get(k) != fingerprint.get(k)
-            )
+        if old is None or allow_change:
+            return
+        before, now = _flatten(old), _flatten(fingerprint)
+        changed = sorted(k for k in set(before) | set(now) if before.get(k) != now.get(k))
+        if changed:
             raise RunAborted(
                 f"{run_dir.name} was run with a different configuration (changed: "
                 f"{', '.join(changed)}). Mixing them would make the numbers meaningless. "

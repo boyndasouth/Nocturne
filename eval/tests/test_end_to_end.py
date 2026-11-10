@@ -134,3 +134,18 @@ def test_linker_and_abstractor_run_in_the_eval(eval_env, monkeypatch):
     assert ku["sleep_cycles"] == "1"  # every 2 sessions -> one cycle
     assert int(ku["links"]) > 0 and int(ku["memory_theme"]) > 0
     assert float(ku["audit_score"]) == 1.0 and int(ku["audit_items"]) > 0  # fake judge: "good"
+
+
+def test_runs_made_before_a_setting_existed_still_resume(eval_env, monkeypatch):
+    import json
+
+    assert main(ARGS) == 0
+    config = eval_env / "e2e" / "config.json"
+    data = json.loads(config.read_text())
+    for key in ("extract_assistant_chars", "extract_prompt"):
+        data["fingerprint"]["backend"].pop(key)  # as written by an older version
+    config.write_text(json.dumps(data))
+    monkeypatch.setenv("EXTRACT_ASSISTANT_CHARS", "0")  # what those runs used
+    assert main(ARGS) == 0
+    monkeypatch.setenv("EXTRACT_PROMPT", "v2")  # a real change is still refused
+    assert main(ARGS) == 2

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.agents.sleep.state import EpisodeIn, FactCandidate
 from app.llm.client import LLMClient
-from app.llm.prompts import EXTRACTOR_SYSTEM, EXTRACTOR_SYSTEM_UNTRIMMED, EXTRACTOR_USER
+from app.llm.prompts import EXTRACTOR_USER, extractor_system
 from app.llm.structured import Usage, chat_json
 
 MAX_FACT_CHARS = 500
@@ -169,13 +169,14 @@ async def extract_batch(
     *,
     max_tokens: int,
     assistant_chars: int = 0,
+    prompt: str = "v1",
 ) -> tuple[list[FactCandidate], Usage]:
     output, usage = await chat_json(
         llm,
         [
             {
                 "role": "system",
-                "content": EXTRACTOR_SYSTEM if assistant_chars > 0 else EXTRACTOR_SYSTEM_UNTRIMMED,
+                "content": extractor_system(trimmed=assistant_chars > 0, version=prompt),
             },
             {
                 "role": "user",

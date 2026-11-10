@@ -12,10 +12,12 @@ thing that differs between rows is the memory: what's in the context and how it 
 
 from __future__ import annotations
 
+import hashlib
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Any
+from uuid import UUID
 
 from langgraph.checkpoint.memory import InMemorySaver
 from psycopg_pool import AsyncConnectionPool
@@ -69,6 +71,15 @@ def _in_memory_checkpointer() -> Callable[[], Any]:
         yield InMemorySaver()
 
     return factory
+
+
+def episode_id(conversation_id: str, index: int) -> UUID:
+    """Deterministic episode ids that sort in dataset order. The sleep runner takes episodes
+    oldest first and breaks timestamp ties by id; LongMemEval-S has sessions sharing a date,
+    so with random ids their turns interleaved differently on every run, which changed the
+    extraction prompts and defeated the LLM cache."""
+    prefix = int.from_bytes(hashlib.sha256(conversation_id.encode()).digest()[:8], "big")
+    return UUID(int=(prefix << 64) | index)
 
 
 def sleep_points(session_ends: list, every: int) -> list:
@@ -161,13 +172,14 @@ class NocturneSystem:
         notes = await self._store.insert_notes(
             [
                 NewNote(
+                    id=episode_id(conv.id, i),
                     tier=Tier.EPISODE,
                     content=e.content,
                     embedding=v,
                     valid_from=e.at,
                     recorded_at=e.at,
                 )
-                for e, v in zip(episodes, vecs, strict=True)
+                for i, (e, v) in enumerate(zip(episodes, vecs, strict=True))
             ]
         )
         if self._runner is not None:

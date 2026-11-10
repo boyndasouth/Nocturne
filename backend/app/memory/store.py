@@ -147,13 +147,14 @@ class MemoryStore:
             cur = await conn.execute(
                 f"""
                 insert into memory_notes
-                    (tier, content, keywords, embedding, strength,
+                    (id, tier, content, keywords, embedding, strength,
                      valid_from, valid_to, recorded_at, status, source_episode_ids)
-                values (%s::note_tier, %s, %s, %s, %s,
+                values (coalesce(%s, gen_random_uuid()), %s::note_tier, %s, %s, %s, %s,
                         coalesce(%s, now()), %s, coalesce(%s, now()), %s::note_status, %s)
                 returning {NOTE_COLUMNS}
                 """,
                 (
+                    n.id,
                     n.tier.value,
                     n.content,
                     n.keywords,

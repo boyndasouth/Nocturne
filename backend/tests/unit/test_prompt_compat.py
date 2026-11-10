@@ -33,3 +33,25 @@ def test_long_episodes_are_cut_the_way_each_phase_cut_them():
     # Phase 4.1: cut on a word boundary; batches sized on the prompt text.
     trimmed = episode_text(long, assistant_chars=400)
     assert trimmed.endswith("abc …") and len(trimmed) <= 4002
+
+
+def test_v2_adds_the_asides_rule_and_v1_is_untouched():
+    from app.llm.prompts import EXTRACTOR_SYSTEMS, extractor_system
+
+    assert extractor_system(trimmed=True) == EXTRACTOR_SYSTEM
+    assert extractor_system(trimmed=False) == EXTRACTOR_SYSTEM_UNTRIMMED
+    for trimmed in (True, False):
+        v1 = extractor_system(trimmed=trimmed, version="v1")
+        v2 = extractor_system(trimmed=trimmed, version="v2")
+        assert "in passing" in v2 and "in passing" not in v1
+        assert v2.replace(v2[v2.index("\n- Read every") : v2.index("\n- From ingested")], "") == v1
+    assert len(EXTRACTOR_SYSTEMS) == 4
+
+
+def test_unknown_prompt_version_is_refused():
+    import pytest
+
+    from app.llm.prompts import extractor_system
+
+    with pytest.raises(ValueError):
+        extractor_system(trimmed=True, version="v9")

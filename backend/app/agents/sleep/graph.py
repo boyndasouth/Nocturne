@@ -78,6 +78,7 @@ class SleepConfig:
     extract_batch_chars: int = 40_000
     extract_batch_episodes: int = 60
     extract_assistant_chars: int = 400
+    extract_prompt: str = "v1"
     judge_batch_groups: int = 40
     neighbors_k: int = 4
     dedup: DedupThresholds = DedupThresholds()
@@ -102,6 +103,7 @@ class SleepConfig:
             extract_batch_chars=s.extract_batch_chars,
             extract_batch_episodes=s.extract_batch_episodes,
             extract_assistant_chars=s.extract_assistant_chars,
+            extract_prompt=s.extract_prompt,
             judge_batch_groups=s.judge_batch_groups,
             neighbors_k=s.neighbors_k,
             dedup=DedupThresholds(auto=s.dedup_auto_sim, judge=s.dedup_judge_sim),
@@ -212,6 +214,7 @@ def build_sleep_graph(
                 cursor,
                 max_tokens=cfg.max_tokens,
                 assistant_chars=cfg.extract_assistant_chars,
+                prompt=cfg.extract_prompt,
             )
         except InvalidJSONError as exc:
             if len(plan[cursor]) < 2:

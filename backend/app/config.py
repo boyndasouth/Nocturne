@@ -116,6 +116,7 @@ class Settings(BaseSettings):
     extract_batch_chars: int = 40_000  # prompt chars per extraction call
     extract_batch_episodes: int = 60
     extract_assistant_chars: int = 400  # assistant reply shown to the Extractor; 0 = all
+    extract_prompt: Literal["v1", "v2"] = "v1"  # v2: also extract facts said in passing
     judge_batch_groups: int = 40  # dedup / contradiction / linker groups per LLM call
     neighbors_k: int = 4
     # Cosine-similarity thresholds (tune on a dev split; see tests/unit/test_dedup.py).

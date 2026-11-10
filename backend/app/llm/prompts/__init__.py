@@ -78,10 +78,36 @@ Episodes (oldest first):
 
 # With EXTRACT_ASSISTANT_CHARS=0 the Extractor sends the Phase 3 prompt byte for byte, so
 # Phase 3 runs replay from the LLM cache (tests/unit/test_prompt_compat.py guards this).
-EXTRACTOR_SYSTEM_UNTRIMMED = EXTRACTOR_SYSTEM.replace(
-    """ Long assistant \
-replies are shortened (they end in "…").""",
-    "",
+_TRIM_NOTE = """ Long assistant \
+replies are shortened (they end in "…")."""
+EXTRACTOR_SYSTEM_UNTRIMMED = EXTRACTOR_SYSTEM.replace(_TRIM_NOTE, "")
+
+# EXTRACT_PROMPT=v2: in big batches (a whole sleep cycle per call) v1 kept a turn's main
+# request and dropped facts the user mentioned in passing. v2 says so explicitly.
+_V2_ASIDES = """
+- Read every episode. A turn that is mainly a request often carries facts in passing: \
+"by the way, my mom uses the same grocery app as me now", "I listen during my 40-minute \
+commute", "I'm particularly interested in history". Extract these asides as facts; they \
+are often what the user will ask about later.
+- Interests, tastes and preferences count even when phrased inside a request ("I want to \
+branch out from true crime", "I'm more of a morning person, so...")."""
+_V2_ANCHOR = """
+- From ingested notes, extract the key claims, definitions, and results."""
+
+
+def extractor_system(*, trimmed: bool, version: str = "v1") -> str:
+    """The Extractor's system prompt for a configuration. v1 is pinned byte for byte (old
+    runs replay from the cache); v2 adds the asides instruction."""
+    base = EXTRACTOR_SYSTEM if trimmed else EXTRACTOR_SYSTEM_UNTRIMMED
+    if version == "v1":
+        return base
+    if version == "v2":
+        return base.replace(_V2_ANCHOR, _V2_ASIDES + _V2_ANCHOR, 1)
+    raise ValueError(f"unknown extractor prompt version {version!r}")
+
+
+EXTRACTOR_SYSTEMS = frozenset(
+    extractor_system(trimmed=t, version=v) for t in (True, False) for v in ("v1", "v2")
 )
 
 DEDUP_SYSTEM = """\
