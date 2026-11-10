@@ -11,12 +11,12 @@ sessions are not sorted by date, so they're sorted here.
 
 from __future__ import annotations
 
-import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from eval.datasets.jsonstream import iter_json_array
 from eval.datasets.schema import Conversation, Question, Session, Turn
 
 BENCHMARK = "longmemeval"
@@ -92,8 +92,6 @@ def parse_instance(item: dict[str, Any]) -> Conversation:
 
 
 def load(path: str | Path) -> list[Conversation]:
-    with open(path, encoding="utf-8") as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        raise ValueError(f"{path}: expected a JSON list of LongMemEval instances")
-    return [parse_instance(item) for item in data]
+    """Streamed one instance at a time: LongMemEval-S needs ~400 MB this way instead of
+    ~2.4 GB with json.load (which can raise MemoryError on a laptop)."""
+    return [parse_instance(item) for item in iter_json_array(path)]
