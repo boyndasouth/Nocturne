@@ -5,9 +5,10 @@
 
 ⟲ = one LLM batch per step. LangGraph checkpoints after every step, so a cycle that fails
 on a rate limit resumes at the batch that failed instead of re-spending quota on the ones that
-succeeded. Batches are large (one extraction call holds a whole day of chat) to fit free-tier
-request quotas; an extraction batch whose answer comes back cut off or unparseable is split
-in two in the frozen plan and retried, so a big batch costs at most a few extra calls.
+succeeded. Batches are large (25 episodes per extraction call) to fit
+free-tier request quotas; an extraction batch whose answer comes back cut off or unparseable
+is split in two in the frozen plan and retried, so a big batch costs at most a few extra
+calls.
 
 Every step before `apply` only reads memory; `apply` writes it in one transaction.
 
@@ -76,9 +77,9 @@ log = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class SleepConfig:
     extract_batch_chars: int = 40_000
-    extract_batch_episodes: int = 60
+    extract_batch_episodes: int = 25
     extract_assistant_chars: int = 400
-    extract_prompt: str = "v1"
+    extract_prompt: str = "v2"
     judge_batch_groups: int = 40
     neighbors_k: int = 4
     dedup: DedupThresholds = DedupThresholds()

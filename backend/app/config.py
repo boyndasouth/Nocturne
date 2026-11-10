@@ -114,9 +114,9 @@ class Settings(BaseSettings):
     # Big batches keep a sleep cycle to a handful of calls (free tiers cap requests per day).
     # A batch whose answer is cut off at sleep_max_tokens is split in two and retried.
     extract_batch_chars: int = 40_000  # prompt chars per extraction call
-    extract_batch_episodes: int = 60
+    extract_batch_episodes: int = 25  # 60 dropped ~1 in 10 evidence turns (probe, Nov 2026)
     extract_assistant_chars: int = 400  # assistant reply shown to the Extractor; 0 = all
-    extract_prompt: Literal["v1", "v2"] = "v1"  # v2: also extract facts said in passing
+    extract_prompt: Literal["v1", "v2"] = "v2"  # v2: also extract facts said in passing
     judge_batch_groups: int = 40  # dedup / contradiction / linker groups per LLM call
     neighbors_k: int = 4
     # Cosine-similarity thresholds (tune on a dev split; see tests/unit/test_dedup.py).

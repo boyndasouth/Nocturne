@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 import psycopg
 from psycopg.rows import dict_row
 
-from app.llm.prompts import CONTRADICTION_SYSTEM, DEDUP_SYSTEM, EXTRACTOR_SYSTEM
+from app.llm.prompts import CONTRADICTION_SYSTEM, DEDUP_SYSTEM, EXTRACTOR_SYSTEMS
 from tests.integration.conftest import FakeLLM, ref_for
 
 JAN = datetime(2026, 1, 10, 9, 0, tzinfo=UTC)
@@ -37,7 +37,7 @@ def sleep_brain(messages) -> str:
     """Scripted sleep LLM: extraction by phrase table; no LLM-judged duplicates; 'lives in'
     facts about different cities conflict."""
     system, user = messages[0]["content"], messages[-1]["content"]
-    if system == EXTRACTOR_SYSTEM:
+    if system in EXTRACTOR_SYSTEMS:
         facts = []
         for n, body in re.findall(
             r"^\[(\d+)\] \([^)]*\)\n(.*?)(?=^\[\d+\] |\Z)", user, re.M | re.S

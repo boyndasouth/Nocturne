@@ -146,6 +146,7 @@ def test_runs_made_before_a_setting_existed_still_resume(eval_env, monkeypatch):
         data["fingerprint"]["backend"].pop(key)  # as written by an older version
     config.write_text(json.dumps(data))
     monkeypatch.setenv("EXTRACT_ASSISTANT_CHARS", "0")  # what those runs used
+    monkeypatch.setenv("EXTRACT_PROMPT", "v1")
     assert main(ARGS) == 0
     monkeypatch.setenv("EXTRACT_PROMPT", "v2")  # a real change is still refused
     assert main(ARGS) == 2

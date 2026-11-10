@@ -15,7 +15,7 @@ from app.llm.prompts import (
     ABSTRACTOR_SYSTEM,
     CONTRADICTION_SYSTEM,
     DEDUP_SYSTEM,
-    EXTRACTOR_SYSTEM,
+    EXTRACTOR_SYSTEMS,
     LINKER_SYSTEM,
 )
 from tests.integration.conftest import FakeLLM
@@ -41,7 +41,7 @@ T = {
 
 def brain(messages) -> str:
     system, user = messages[0]["content"], messages[-1]["content"]
-    if system == EXTRACTOR_SYSTEM:
+    if system in EXTRACTOR_SYSTEMS:
         out = []
         for n, body in re.findall(
             r"^\[(\d+)\] \([^)]*\)\n(.*?)(?=^\[\d+\] |\Z)", user, re.M | re.S

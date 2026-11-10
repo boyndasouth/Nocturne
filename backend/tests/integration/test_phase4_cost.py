@@ -7,7 +7,7 @@ import re
 from collections.abc import Sequence
 
 from app.llm.client import ChatMessage, LLMResponse
-from app.llm.prompts import EXTRACTOR_SYSTEM
+from app.llm.prompts import EXTRACTOR_SYSTEMS
 from tests.integration.conftest import FakeLLM
 from tests.integration.test_phase2 import JAN, JAN_SLEEP, chat, facts, sleep, sleep_brain
 
@@ -24,7 +24,7 @@ class TruncatingLLM(FakeLLM):
     async def chat(
         self, messages: Sequence[ChatMessage], *, trace_name: str = "llm.chat", **kw: object
     ) -> LLMResponse:
-        if messages[0]["content"] == EXTRACTOR_SYSTEM:
+        if messages[0]["content"] in EXTRACTOR_SYSTEMS:
             n = len(re.findall(r"^\[\d+\] \(", messages[-1]["content"], re.M))
             self.batch_sizes.append(n)
             if n > self.max_episodes:
