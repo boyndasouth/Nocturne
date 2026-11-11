@@ -25,6 +25,38 @@ Make clear what came from memory and what didn't.
 mention what changed when it's relevant.
 - Be concise."""
 
+# RESPONDER_PROMPT=v2: rules for three ways answers went wrong in Phase 4 analysis: a
+# near-miss premise answered as if it matched, an incomplete count, and a comparison with
+# one side missing. Its examples are deliberately not taken from benchmark questions. v1 is
+# unchanged byte for byte, so cached answers replay.
+_RESPONDER_V2_RULES = """
+- Check that a memory is about exactly what was asked. If the memories hold something \
+similar but different (asked about a tennis racket, the memory mentions a badminton \
+racket; asked about two cities, only one is in memory), say what you do know and that you \
+have no record of the rest. Never answer as if they were the same thing.
+- For "how many" or "list all" questions, go through every memory, collect each distinct \
+item that fits (counting each one once, even if several memories mention it), and name them \
+before giving the count.
+- For "which came first" and other comparisons, find the date of each item in the memories \
+and compare them. If one item isn't in the memories, say so instead of guessing."""
+_RESPONDER_V2_ANCHOR = """
+- For general knowledge questions"""
+
+
+def responder_system(version: str = "v1") -> str:
+    """The Responder's system prompt. Baselines answer with the same version, so a prompt
+    change never counts as a memory improvement."""
+    if version == "v1":
+        return RESPONDER_SYSTEM
+    if version == "v2":
+        return RESPONDER_SYSTEM.replace(
+            _RESPONDER_V2_ANCHOR, _RESPONDER_V2_RULES + _RESPONDER_V2_ANCHOR, 1
+        )
+    raise ValueError(f"unknown responder prompt version {version!r}")
+
+
+RESPONDER_SYSTEMS = frozenset(responder_system(v) for v in ("v1", "v2"))
+
 RESPONDER_USER = """\
 Current time: {now}
 

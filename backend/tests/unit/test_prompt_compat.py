@@ -55,3 +55,22 @@ def test_unknown_prompt_version_is_refused():
 
     with pytest.raises(ValueError):
         extractor_system(trimmed=True, version="v9")
+
+
+PHASE3_RESPONDER = "fdab7266e76e1d6969609bfeb15a8996903221292c3e4fe7cf89f2457857d0b0"
+
+
+def test_responder_v1_is_unchanged_and_v2_only_adds_rules():
+    import pytest
+
+    from app.llm.prompts import RESPONDER_SYSTEM, RESPONDER_SYSTEMS, responder_system
+
+    assert sha(RESPONDER_SYSTEM) == PHASE3_RESPONDER == sha(responder_system("v1"))
+    v2 = responder_system("v2")
+    added = v2[v2.index("\n- Check that a memory") : v2.index("\n- For general knowledge")]
+    assert v2.replace(added, "") == RESPONDER_SYSTEM
+    for rule in ("exactly what was asked", '"how many"', '"which came first"'):
+        assert rule in added
+    assert len(RESPONDER_SYSTEMS) == 2
+    with pytest.raises(ValueError):
+        responder_system("v3")

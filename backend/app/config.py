@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     # least `ratio` x the best result (so a question can't be answered from raw turns alone).
     retrieval_fact_slots: int = 3
     retrieval_fact_slot_ratio: float = 0.6
+    # Phase 4 options, off by default (see app/memory/retriever.py):
+    retrieval_extra_facts: int = 0  # more facts after the top k, for counting questions
+    retrieval_split_queries: bool = False  # search each side of "A or B" separately too
+    retrieval_split_slots: int = 2
+    responder_prompt: Literal["v1", "v2"] = "v1"  # v2: near-miss, counting, comparison rules
     # Memory block given to the answer model; the eval's naive-RAG baseline gets the same.
     context_budget_chars: int = 12_000
     context_item_max_chars: int = 3_000
@@ -155,6 +160,9 @@ class Settings(BaseSettings):
             fallback_min_score=self.retrieval_fallback_min_score,
             fact_slots=self.retrieval_fact_slots,
             fact_slot_ratio=self.retrieval_fact_slot_ratio,
+            extra_facts=self.retrieval_extra_facts,
+            split_queries=self.retrieval_split_queries,
+            split_slots=self.retrieval_split_slots,
         )
 
     @property

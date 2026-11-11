@@ -10,7 +10,7 @@ from typing import Protocol
 
 from app.llm.client import LLMClient
 from app.llm.embeddings import Embedder
-from app.llm.prompts import RESPONDER_SYSTEM, RESPONDER_USER
+from app.llm.prompts import RESPONDER_USER, responder_system
 from eval.datasets.schema import Conversation, Question
 
 
@@ -55,12 +55,19 @@ class System(Protocol):
 
 
 async def answer_with_context(
-    llm: LLMClient, question: str, memories: str, *, now: datetime, max_tokens: int
+    llm: LLMClient,
+    question: str,
+    memories: str,
+    *,
+    now: datetime,
+    max_tokens: int,
+    prompt: str = "v1",
 ) -> str:
-    """The Responder's prompt and sampling, for baselines that build their own context."""
+    """The Responder's prompt and sampling, for baselines that build their own context.
+    `prompt` is the Responder prompt version, the same one Nocturne answers with."""
     resp = await llm.chat(
         [
-            {"role": "system", "content": RESPONDER_SYSTEM},
+            {"role": "system", "content": responder_system(prompt)},
             {
                 "role": "user",
                 "content": RESPONDER_USER.format(

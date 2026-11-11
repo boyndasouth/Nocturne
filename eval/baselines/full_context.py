@@ -42,12 +42,19 @@ def fit_recent(lines: list[str], budget_tokens: int) -> tuple[list[str], int]:
 
 class FullContextSystem:
     def __init__(
-        self, *, answer_llm: LLMClient, budget_tokens: int, max_tokens: int, name: str = ""
+        self,
+        *,
+        answer_llm: LLMClient,
+        budget_tokens: int,
+        max_tokens: int,
+        name: str = "",
+        prompt: str = "v1",
     ) -> None:
         self.name = name or "full-context"
         self._llm = answer_llm
         self._budget = budget_tokens
         self._max_tokens = max_tokens
+        self._prompt = prompt
         self._context = ""
         self.truncated_episodes = 0
 
@@ -71,7 +78,12 @@ class FullContextSystem:
 
     async def answer(self, q: Question) -> SystemAnswer:
         text = await answer_with_context(
-            self._llm, q.question, self._context, now=q.asked_at, max_tokens=self._max_tokens
+            self._llm,
+            q.question,
+            self._context,
+            now=q.asked_at,
+            max_tokens=self._max_tokens,
+            prompt=self._prompt,
         )
         return SystemAnswer(text=text, context_chars=len(self._context))
 

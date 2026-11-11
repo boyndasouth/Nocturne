@@ -17,7 +17,7 @@ from app.llm.prompts import (
     DEDUP_SYSTEM,
     EXTRACTOR_SYSTEMS,
     LINKER_SYSTEM,
-    RESPONDER_SYSTEM,
+    RESPONDER_SYSTEMS,
 )
 
 _EPISODE_RE = re.compile(r"^\[(\d+)\] \([^)]*\)\n(.*?)(?=^\[\d+\] |\Z)", re.M | re.S)
@@ -96,7 +96,7 @@ class FakeLLM:
             return json.dumps(
                 {"verdicts": [{"item": int(i), "verdict": "good", "note": ""} for i in items]}
             )
-        if system == RESPONDER_SYSTEM:
+        if system in RESPONDER_SYSTEMS:
             hits = _MEMORY_RE.findall(user)
             return hits[0][:400] if hits else "I don't have that in memory."
         return self._judge(user)

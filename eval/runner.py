@@ -160,6 +160,7 @@ def build_systems(
                     answer_llm=clients.answer,
                     budget_tokens=es.full_context_tokens,
                     max_tokens=s.online_max_tokens,
+                    prompt=s.responder_prompt,
                 )
             )
         elif name == "naive-rag":
@@ -171,6 +172,7 @@ def build_systems(
                     max_tokens=s.online_max_tokens,
                     budget_chars=s.context_budget_chars,
                     item_max_chars=s.context_item_max_chars,
+                    prompt=s.responder_prompt,
                 )
             )
         elif name in NOCTURNE_SYSTEMS:
@@ -250,6 +252,10 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
                 "retrieval_fallback_min_score",
                 "retrieval_fact_slots",
                 "retrieval_fact_slot_ratio",
+                "retrieval_extra_facts",
+                "retrieval_split_queries",
+                "retrieval_split_slots",
+                "responder_prompt",
                 "context_budget_chars",
                 "context_item_max_chars",
                 "retrieval_candidate_pool",
@@ -300,7 +306,14 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
 # Backend settings added to the fingerprint after runs were made, with the value those
 # older runs implicitly used. A run made before the key existed resumes only if the
 # current value is the same.
-ADDED_BACKEND_KEYS: dict[str, Any] = {"extract_assistant_chars": 0, "extract_prompt": "v1"}
+ADDED_BACKEND_KEYS: dict[str, Any] = {
+    "extract_assistant_chars": 0,
+    "extract_prompt": "v1",
+    "retrieval_extra_facts": 0,
+    "retrieval_split_queries": False,
+    "retrieval_split_slots": 2,
+    "responder_prompt": "v1",
+}
 
 
 def _flatten(fp: dict) -> dict:

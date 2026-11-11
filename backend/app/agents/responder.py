@@ -11,7 +11,7 @@ from uuid import UUID
 
 from app.agents.episode_writer import EpisodeWriter
 from app.llm.client import ChatMessage, LLMClient, LLMError
-from app.llm.prompts import RESPONDER_SYSTEM, RESPONDER_USER
+from app.llm.prompts import RESPONDER_USER, responder_system
 from app.llm.tracing import Tracer
 from app.memory.excerpt import fit
 from app.memory.models import MemoryNote, ScoredNote, Tier
@@ -141,7 +141,9 @@ class Responder:
         max_tokens: int = 800,
         context_budget_chars: int = CONTEXT_BUDGET_CHARS,
         context_item_max_chars: int = CONTEXT_ITEM_MAX_CHARS,
+        prompt: str = "v1",
     ) -> None:
+        self._system = responder_system(prompt)
         self._budget = context_budget_chars
         self._item_max = context_item_max_chars
         self._llm = llm
@@ -181,7 +183,7 @@ class Responder:
             )
 
             messages: list[ChatMessage] = [
-                {"role": "system", "content": RESPONDER_SYSTEM},
+                {"role": "system", "content": self._system},
                 {
                     "role": "user",
                     "content": RESPONDER_USER.format(

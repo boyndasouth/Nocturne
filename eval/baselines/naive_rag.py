@@ -43,6 +43,7 @@ class NaiveRagSystem:
         budget_chars: int = 12_000,
         item_max_chars: int = 3_000,
         name: str = "naive-rag",
+        prompt: str = "v1",
     ) -> None:
         self._budget = budget_chars
         self._item_max = item_max_chars
@@ -51,6 +52,7 @@ class NaiveRagSystem:
         self._embedder = embedder
         self._k = top_k
         self._max_tokens = max_tokens
+        self._prompt = prompt
         self._chunks: list[Episode] = []
         self._matrix = np.zeros((0, embedder.dim), dtype=np.float32)
 
@@ -90,7 +92,12 @@ class NaiveRagSystem:
             else "(no memories yet)"
         )
         text = await answer_with_context(
-            self._llm, q.question, context, now=q.asked_at, max_tokens=self._max_tokens
+            self._llm,
+            q.question,
+            context,
+            now=q.asked_at,
+            max_tokens=self._max_tokens,
+            prompt=self._prompt,
         )
         return SystemAnswer(
             text=text, retrieval_ms=retrieval_ms, retrieved=len(hits), context_chars=len(context)
