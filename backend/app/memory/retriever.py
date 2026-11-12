@@ -86,7 +86,9 @@ class RetrievalConfig:
 
 
 # "A or B", "A vs B": the left side starts after the last comma / colon / "between".
-_OR_RE = re.compile(r"(?:^|[,;:]\s*)(?P<a>[^,;:]+?)\s+(?:or|vs\.?|versus)\s+(?P<b>[^,;:?!.]+)", re.I)
+_OR_RE = re.compile(
+    r"(?:^|[,;:]\s*)(?P<a>[^,;:]+?)\s+(?:or|vs\.?|versus)\s+(?P<b>[^,;:?!.]+)", re.I
+)
 _BETWEEN_RE = re.compile(r"\bbetween\s+(?P<a>.+?)\s+and\s+(?P<b>[^?!.]+)", re.I)
 # "and" joins far more than comparisons, so only these question shapes are split on it.
 _AND_TRIGGER_RE = re.compile(
