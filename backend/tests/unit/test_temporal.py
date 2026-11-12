@@ -30,6 +30,12 @@ def window(q: str, now: datetime = NOW) -> tuple[date, date] | None:
         ("What did I do 3 days ago?", (date(2023, 6, 11), date(2023, 6, 14))),
         ("What did I do last week?", (date(2023, 6, 1), date(2023, 6, 16))),
         ("What did I eat last month?", (date(2023, 5, 1), date(2023, 6, 1))),
+        # "the last/past month" (and N units) is a rolling window ending today
+        ("How many plants did I get in the last month?", (date(2023, 5, 16), date(2023, 6, 16))),
+        ("What did I bake in the past two weeks?", (date(2023, 6, 1), date(2023, 6, 16))),
+        ("Which films did I watch in the last 3 months?", (date(2023, 3, 17), date(2023, 6, 16))),
+        ("What changed over the last year?", (date(2022, 6, 15), date(2023, 6, 16))),
+        ("What did I do over the previous 10 days?", (date(2023, 6, 5), date(2023, 6, 16))),
         ("Anything this month?", (date(2023, 6, 1), date(2023, 7, 1))),
         ("What did I do last year?", (date(2022, 1, 1), date(2023, 1, 1))),
         ("What happened last Saturday?", (date(2023, 6, 10), date(2023, 6, 11))),

@@ -69,7 +69,14 @@ _YEAR_RE = re.compile(
 _AGO_RE = re.compile(
     rf"\b(?P<n>\d+|{_NUM_ALT})\s+(?P<u>day|week|month|year)s?\s+ago\b", re.IGNORECASE
 )
-_LAST_RE = re.compile(r"\b(?P<w>last|this|past|previous)\s+(?P<u>week|month|year)\b", re.I)
+_LAST_RE = re.compile(
+    r"\b(?P<the>the\s+)?(?P<w>last|this|past|previous)\s+(?P<u>week|month|year)\b", re.I
+)
+# "in the past two weeks", "over the last 3 months": a rolling window ending today.
+_ROLLING_RE = re.compile(
+    rf"\b(?:last|past|previous)\s+(?P<n>\d+|{_NUM_ALT})\s+(?P<u>day|week|month|year)s\b",
+    re.IGNORECASE,
+)
 _LAST_WEEKDAY_RE = re.compile(rf"\b(?:last|on)\s+(?P<d>{'|'.join(_WEEKDAYS)})\b", re.I)
 _YESTERDAY_RE = re.compile(r"\byesterday\b", re.I)
 _MOD_PREFIX_RE = re.compile(_MOD + r"$", re.IGNORECASE)
@@ -167,8 +174,16 @@ def parse_time_window(query: str, now: datetime) -> TimeWindow | None:
         return TimeWindow(center - timedelta(days=slack), center + timedelta(days=slack + 1),
                           m.group())  # fmt: skip
 
+    if m := _ROLLING_RE.search(text):
+        raw = m["n"].lower()
+        days = (int(raw) if raw.isdigit() else _NUMBERS[raw]) * _UNIT_DAYS[m["u"].lower()]
+        return TimeWindow(today - timedelta(days=days), today + timedelta(days=1), m.group())
+
     if m := _LAST_RE.search(text):
         which, unit = m["w"].lower(), m["u"].lower()
+        # "in the last month" is the past 30 days; plain "last month" is the calendar month.
+        if m["the"] and which in ("last", "previous"):
+            which = "past"
         if unit == "week":
             start = today - timedelta(days=14 if which in ("last", "previous") else 7)
             return TimeWindow(start, today + timedelta(days=1), m.group())
