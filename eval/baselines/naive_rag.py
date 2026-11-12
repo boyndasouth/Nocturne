@@ -44,6 +44,7 @@ class NaiveRagSystem:
         item_max_chars: int = 3_000,
         name: str = "naive-rag",
         prompt: str = "v1",
+        temperature: float = 0.2,
     ) -> None:
         self._budget = budget_chars
         self._item_max = item_max_chars
@@ -53,6 +54,7 @@ class NaiveRagSystem:
         self._k = top_k
         self._max_tokens = max_tokens
         self._prompt = prompt
+        self._temperature = temperature
         self._chunks: list[Episode] = []
         self._matrix = np.zeros((0, embedder.dim), dtype=np.float32)
 
@@ -98,9 +100,14 @@ class NaiveRagSystem:
             now=q.asked_at,
             max_tokens=self._max_tokens,
             prompt=self._prompt,
+            temperature=self._temperature,
         )
         return SystemAnswer(
-            text=text, retrieval_ms=retrieval_ms, retrieved=len(hits), context_chars=len(context)
+            text=text,
+            retrieval_ms=retrieval_ms,
+            retrieved=len(hits),
+            context_chars=len(context),
+            context=context,
         )
 
     async def aclose(self) -> None:

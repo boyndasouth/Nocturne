@@ -4,6 +4,7 @@ systems. Skipped without TEST_DATABASE_URL (same disposable database as backend 
 from __future__ import annotations
 
 import csv
+import json
 import os
 from pathlib import Path
 
@@ -88,6 +89,13 @@ def test_fake_run_produces_results_for_every_system_and_resumes(eval_env):
     assert float(totals["nocturne"]["evidence_coverage"]) == 1.0
     assert totals["nocturne-no-sleep"]["evidence_coverage"] == ""
 
+    # What each answer was based on, except full context (same, huge, every question)
+    contexts = [json.loads(line) for line in (run / "contexts.jsonl").read_text().splitlines()]
+    assert {c["system"] for c in contexts} == {"naive-rag", "nocturne-no-sleep", "nocturne"}
+    assert all(c["context"].strip() for c in contexts)
+    # The eval answers at temperature 0, so the same memories give the same answer.
+    config = json.loads((run / "config.json").read_text())
+    assert config["fingerprint"]["backend"]["responder_temperature"] == 0.0
     lines_before = (run / "questions.jsonl").read_text().count("\n")
     assert main(ARGS) == 0  # resume: nothing left to do
     assert (run / "questions.jsonl").read_text().count("\n") == lines_before

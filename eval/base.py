@@ -42,6 +42,9 @@ class SystemAnswer:
     retrieved: int = 0
     context_chars: int = 0
     retrieved_via: str = ""  # nocturne only: what retrieval returned, by tier and route
+    # The memories the answer model was shown (contexts.jsonl). Full context leaves it
+    # empty: its context is the same for every question and can be huge.
+    context: str = ""
 
 
 class System(Protocol):
@@ -62,6 +65,7 @@ async def answer_with_context(
     now: datetime,
     max_tokens: int,
     prompt: str = "v1",
+    temperature: float = 0.2,
 ) -> str:
     """The Responder's prompt and sampling, for baselines that build their own context.
     `prompt` is the Responder prompt version, the same one Nocturne answers with."""
@@ -75,7 +79,7 @@ async def answer_with_context(
                 ),
             },
         ],
-        temperature=0.2,
+        temperature=temperature,
         max_tokens=max_tokens,
         trace_name="eval.answer",
     )

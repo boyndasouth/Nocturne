@@ -62,7 +62,10 @@ class RunConfig:
 def backend_settings(eval_settings: EvalSettings, *, fake: bool) -> Settings:
     """The app's settings (from backend/.env), pointed at the eval database, with the idle
     trigger off. Fake runs use the hash embedder so no model download is needed."""
-    overrides: dict[str, Any] = {"sleep_auto": False}
+    overrides: dict[str, Any] = {
+        "sleep_auto": False,
+        "responder_temperature": eval_settings.answer_temperature,
+    }
     # Never fall back to the app's DATABASE_URL: the eval database is wiped constantly.
     overrides["database_url"] = eval_settings.database_url or "postgresql://unset/eval"
     if fake:
@@ -161,6 +164,7 @@ def build_systems(
                     budget_tokens=es.full_context_tokens,
                     max_tokens=s.online_max_tokens,
                     prompt=s.responder_prompt,
+                    temperature=s.responder_temperature,
                 )
             )
         elif name == "naive-rag":
@@ -173,6 +177,7 @@ def build_systems(
                     budget_chars=s.context_budget_chars,
                     item_max_chars=s.context_item_max_chars,
                     prompt=s.responder_prompt,
+                    temperature=s.responder_temperature,
                 )
             )
         elif name in NOCTURNE_SYSTEMS:
@@ -256,6 +261,7 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
                 "retrieval_split_queries",
                 "retrieval_split_slots",
                 "responder_prompt",
+                "responder_temperature",
                 "context_budget_chars",
                 "context_item_max_chars",
                 "retrieval_candidate_pool",
@@ -313,6 +319,7 @@ ADDED_BACKEND_KEYS: dict[str, Any] = {
     "retrieval_split_queries": False,
     "retrieval_split_slots": 2,
     "responder_prompt": "v1",
+    "responder_temperature": 0.2,
 }
 
 
@@ -413,6 +420,8 @@ async def run(
 ) -> None:
     done = completed(run_dir)
     qrows = JsonlWriter(run_dir / "questions.jsonl")
+    # What the answer model was shown, per question: to see why an answer went wrong.
+    xrows = JsonlWriter(run_dir / "contexts.jsonl")
     crows = JsonlWriter(run_dir / "conversations.jsonl")
     total = sum(len(c.questions) for c in conversations) * len(systems)
     progress = len(
@@ -532,6 +541,10 @@ async def run(
                         judge_tokens=(clients.judge.meter.snapshot() - j0).tokens,
                     )
                     qrows.write(row)
+                    if ans.context:
+                        xrows.write(
+                            {"system": system.name, "question_id": q.id, "context": ans.context}
+                        )
                     mark = {True: "ok", False: "x", None: "?"}[verdict.correct]
                     log(
                         f"[{progress}/{total}] {system.name:<18} {q.category:<26} "
@@ -539,6 +552,7 @@ async def run(
                     )
     finally:
         qrows.close()
+        xrows.close()
         crows.close()
 
 

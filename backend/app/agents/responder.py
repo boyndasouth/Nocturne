@@ -142,8 +142,10 @@ class Responder:
         context_budget_chars: int = CONTEXT_BUDGET_CHARS,
         context_item_max_chars: int = CONTEXT_ITEM_MAX_CHARS,
         prompt: str = "v1",
+        temperature: float = 0.2,
     ) -> None:
         self._system = responder_system(prompt)
+        self._temperature = temperature
         self._budget = context_budget_chars
         self._item_max = context_item_max_chars
         self._llm = llm
@@ -193,7 +195,10 @@ class Responder:
             ]
             try:
                 resp = await self._llm.chat(
-                    messages, temperature=0.2, max_tokens=self._max_tokens, trace_name="responder"
+                    messages,
+                    temperature=self._temperature,
+                    max_tokens=self._max_tokens,
+                    trace_name="responder",
                 )
             except LLMError:
                 # Never lose user input: log the turn without an answer, then surface the error.

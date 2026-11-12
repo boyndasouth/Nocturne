@@ -95,6 +95,7 @@ def create_app(
             context_item_max_chars=settings.context_item_max_chars,
             max_tokens=settings.online_max_tokens,
             prompt=settings.responder_prompt,
+            temperature=settings.responder_temperature,
         )
         cycles = CycleStore(pool)
         activity = ActivityClock()

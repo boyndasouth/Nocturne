@@ -44,6 +44,9 @@ class EvalSettings(BaseSettings):
     # Raw-history budget for the full-context baseline (see baselines/full_context.py).
     # 5,000 keeps one request under Groq's free 8K tokens/minute with room for the answer.
     full_context_tokens: int = 5_000
+    # 0 so the same memories give the same answer and runs differ only by what changed
+    # (the app answers at RESPONDER_TEMPERATURE, 0.2).
+    answer_temperature: float = 0.0
 
     # nocturne sleeps after every N-th session (1 = between every pair of sessions, spec §9).
     # LongMemEval-S has ~50 sessions per question: 5-10 keeps it within a daily quota.

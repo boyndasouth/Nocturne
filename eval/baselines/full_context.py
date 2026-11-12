@@ -49,12 +49,14 @@ class FullContextSystem:
         max_tokens: int,
         name: str = "",
         prompt: str = "v1",
+        temperature: float = 0.2,
     ) -> None:
         self.name = name or "full-context"
         self._llm = answer_llm
         self._budget = budget_tokens
         self._max_tokens = max_tokens
         self._prompt = prompt
+        self._temperature = temperature
         self._context = ""
         self.truncated_episodes = 0
 
@@ -84,6 +86,7 @@ class FullContextSystem:
             now=q.asked_at,
             max_tokens=self._max_tokens,
             prompt=self._prompt,
+            temperature=self._temperature,
         )
         return SystemAnswer(text=text, context_chars=len(self._context))
 

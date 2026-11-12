@@ -83,7 +83,8 @@ class Settings(BaseSettings):
     retrieval_extra_facts: int = 10  # more facts after the top k, for counting questions
     retrieval_split_queries: bool = True  # search each side of "A or B" separately too
     retrieval_split_slots: int = 2
-    responder_prompt: Literal["v1", "v2"] = "v1"  # v2: near-miss, counting, comparison rules
+    responder_prompt: Literal["v1", "v2"] = "v1"
+    responder_temperature: float = 0.2  # the eval answers at EVAL_ANSWER_TEMPERATURE (0)  # v2: near-miss, counting, comparison rules
     # Memory block given to the answer model; the eval's naive-RAG baseline gets the same.
     context_budget_chars: int = 12_000
     context_item_max_chars: int = 3_000

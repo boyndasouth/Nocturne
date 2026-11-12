@@ -146,6 +146,7 @@ class NocturneSystem:
             context_item_max_chars=settings.context_item_max_chars,
             max_tokens=settings.online_max_tokens,
             prompt=settings.responder_prompt,
+            temperature=settings.responder_temperature,
         )
         self._runner = (
             SleepRunner(
@@ -205,6 +206,7 @@ class NocturneSystem:
             retrieved=self._retriever.last_count,
             context_chars=len(result.context),
             retrieved_via=self._retriever.last_via,
+            context=result.context,
         )
 
     async def aclose(self) -> None:
