@@ -78,9 +78,10 @@ class Settings(BaseSettings):
     # least `ratio` x the best result (so a question can't be answered from raw turns alone).
     retrieval_fact_slots: int = 3
     retrieval_fact_slot_ratio: float = 0.6
-    # Phase 4 options, off by default (see app/memory/retriever.py):
-    retrieval_extra_facts: int = 0  # more facts after the top k, for counting questions
-    retrieval_split_queries: bool = False  # search each side of "A or B" separately too
+    # Phase 4 options (see app/memory/retriever.py). Dev run Nov 2026: extra facts fixed a
+    # question and broke none; split had nothing to fix on dev but costs nothing when unused.
+    retrieval_extra_facts: int = 10  # more facts after the top k, for counting questions
+    retrieval_split_queries: bool = True  # search each side of "A or B" separately too
     retrieval_split_slots: int = 2
     responder_prompt: Literal["v1", "v2"] = "v1"  # v2: near-miss, counting, comparison rules
     # Memory block given to the answer model; the eval's naive-RAG baseline gets the same.

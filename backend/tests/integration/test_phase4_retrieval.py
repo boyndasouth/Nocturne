@@ -18,13 +18,15 @@ def fill(m):
 
 
 def test_without_split_one_side_crowds_out_the_other(mem):  # noqa: F811
-    m = mem(retrieval_top_k=3, retrieval_fact_slots=0)
+    m = mem(retrieval_top_k=3, retrieval_fact_slots=0, retrieval_extra_facts=0,
+            retrieval_split_queries=False)  # fmt: skip
     fill(m)
     assert "The user installed a smart thermostat in March." not in contents(m.retrieve(COMPARE))
 
 
 def test_split_keeps_both_sides(mem):  # noqa: F811
-    m = mem(retrieval_top_k=3, retrieval_fact_slots=0, retrieval_split_queries=True)
+    m = mem(retrieval_top_k=3, retrieval_fact_slots=0, retrieval_extra_facts=0,
+            retrieval_split_queries=True)  # fmt: skip
     thermostat = fill(m)
     out = m.retrieve(COMPARE)
     assert len(out) == 3
