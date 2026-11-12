@@ -158,3 +158,18 @@ def test_runs_made_before_a_setting_existed_still_resume(eval_env, monkeypatch):
     assert main(ARGS) == 0
     monkeypatch.setenv("EXTRACT_PROMPT", "v2")  # a real change is still refused
     assert main(ARGS) == 2
+
+
+def test_one_question_run_leaves_its_memory_to_inspect(eval_env, capsys):
+    from eval.dump_memory import dump
+
+    args = [a if a != "e2e" else "one" for a in ARGS]
+    assert main([*args, "--questions", "ku_001", "--systems", "nocturne"]) == 0
+    questions = (eval_env / "one" / "questions.jsonl").read_text().splitlines()
+    assert [json.loads(q)["question_id"] for q in questions] == ["ku_001"]
+
+    capsys.readouterr()
+    assert dump(TEST_DB_URL, ["dallas"], ["fact"]) == 0
+    out = capsys.readouterr().out
+    assert "Dallas" in out and "fact | active" in out
+    assert dump(TEST_DB_URL, ["no-such-word"], ["fact"]) == 1

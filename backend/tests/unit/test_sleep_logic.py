@@ -176,6 +176,21 @@ def test_plan_folds_in_cycle_duplicates_and_merges_into_existing():
     assert plan.supersessions == []
 
 
+def test_a_merge_record_keeps_the_merged_statement():
+    """Merged-away candidates are never stored as notes; the version record must say what
+    they were, or a bad merge can't be found or reversed."""
+    from app.agents.sleep.apply import MergePlan, merge_reason
+
+    x = uuid4()
+    c = cand("0.2", "The user bought a peace lily and a succulent.")
+    [m] = plan_apply([c], {"0.2": "n:" + str(x)}, [], {x: JAN}).merges
+    assert m.contents == ["The user bought a peace lily and a succulent."]
+    reason = merge_reason(m)
+    assert reason.startswith("merged duplicate evidence from 1 episode(s): The user bought")
+    long = MergePlan(x, [uuid4()], ["k"], ["word " * 400])
+    assert len(merge_reason(long)) == 1000 and merge_reason(long).endswith("…")
+
+
 def test_plan_supersession_chain_uses_earliest_winner():
     """A (Jan) -> B (Mar) -> C (May), all pairwise conflicting: A ends when B starts, and the
     links form a chain C -> B -> A rather than C -> A."""

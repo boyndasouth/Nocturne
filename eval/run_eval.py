@@ -18,6 +18,7 @@ import argparse
 import asyncio
 import sys
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 # `python eval/run_eval.py` puts eval/ itself on sys.path, where eval/datasets would shadow
@@ -70,6 +71,12 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     p.add_argument("--categories", default="", help="comma-separated category filter")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument(
+        "--questions",
+        default="",
+        help="comma-separated question ids instead of --limit (e.g. to inspect one question's"
+        " memory afterwards with eval/dump_memory.py)",
+    )
     p.add_argument("--run-name", help="default: <dataset>[-fake]")
     p.add_argument(
         "--fake",
@@ -144,13 +151,22 @@ async def amain(args: argparse.Namespace) -> int:
         max_errors=args.max_errors,
     )
 
-    conversations = datasets.select(
-        datasets.load_dataset(cfg.dataset, args.data_path),
-        limit=cfg.limit,
-        split=cfg.split,
-        categories=cfg.categories or None,
-        seed=cfg.seed,
-    )
+    loaded = datasets.load_dataset(cfg.dataset, args.data_path)
+    if args.questions:
+        wanted = {q.strip() for q in args.questions.split(",") if q.strip()}
+        conversations = [
+            replace(c, questions=qs)
+            for c in loaded
+            if (qs := tuple(q for q in c.questions if q.id in wanted))
+        ]
+    else:
+        conversations = datasets.select(
+            loaded,
+            limit=cfg.limit,
+            split=cfg.split,
+            categories=cfg.categories or None,
+            seed=cfg.seed,
+        )
     n_questions = sum(len(c.questions) for c in conversations)
     if not n_questions:
         raise SystemExit("no questions match the selection")

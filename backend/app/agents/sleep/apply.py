@@ -48,6 +48,8 @@ class MergePlan:
     note_id: UUID
     add_episode_ids: list[UUID]
     candidate_keys: list[str]
+    # The merged-away statements: not stored as notes, so the version record keeps them.
+    contents: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -122,6 +124,7 @@ def plan_apply(
             m = merges.setdefault(note_id, MergePlan(note_id, [], []))
             m.add_episode_ids = _unique([*m.add_episode_ids, *cand.source_episode_ids])
             m.candidate_keys.append(cand.key)
+            m.contents.append(cand.content)
 
     def timed(ref: str) -> Timed:
         kind, value = parse_ref(ref)
@@ -171,6 +174,15 @@ class ApplyResult:
     themes_archived: int = 0
     episodes_archived: int = 0
     facts_archived: int = 0
+
+
+def merge_reason(m: MergePlan, *, limit: int = 1000) -> str:
+    """The version record for a merge: what was folded in, so a bad merge (two different
+    facts judged duplicates) can be found and reversed."""
+    text = f"merged duplicate evidence from {len(m.add_episode_ids)} episode(s): " + " | ".join(
+        m.contents
+    )
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 async def apply_plan(
@@ -225,7 +237,7 @@ async def apply_plan(
                 m.add_episode_ids,
                 eta=reinforce_eta,
                 cycle_id=cycle_id,
-                reason=f"merged duplicate evidence from {len(m.add_episode_ids)} episode(s)",
+                reason=merge_reason(m),
             )
         for s in plan.supersessions:
             winner, loser = note_id(s.winner), note_id(s.loser)
