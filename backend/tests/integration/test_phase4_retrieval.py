@@ -43,3 +43,23 @@ def test_extra_facts_widen_the_result_for_counting(mem):  # noqa: F811
     out = m.retrieve("How many doctors did I visit?")
     assert sum("doctor" in c for c in contents(out)) == 4
     assert "The user likes hiking." not in contents(out)
+
+
+def test_time_words_no_longer_outrank_the_topic(mem):  # noqa: F811
+    """'in the last month' becomes a window; searching its words too ranked a parking ticket
+    'last month' above the plants (a dev miss: 'How many plants did I acquire...')."""
+    from datetime import UTC, datetime
+
+    may = datetime(2026, 5, 10, tzinfo=UTC)
+    question = "How many plants did I acquire in the last month?"
+    kw = dict(retrieval_top_k=1, retrieval_fact_slots=0, retrieval_extra_facts=0)
+
+    def run(strip: bool) -> list[str]:
+        m = mem(retrieval_strip_time_phrase=strip, **kw)
+        m.add("The user got a parking ticket last month.", at=may)
+        m.add("The user started a new job last month.", at=may)
+        m.add("The user bought plants: a peace lily and a succulent.", at=may)
+        return contents(m.retrieve(question))
+
+    assert run(False) != ["The user bought plants: a peace lily and a succulent."]
+    assert run(True) == ["The user bought plants: a peace lily and a succulent."]

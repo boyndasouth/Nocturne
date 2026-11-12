@@ -93,3 +93,45 @@ def test_extra_facts_follow_the_top_and_respect_the_ratio():
     assert [s.score for s in out] == [0.9, 0.8, 0.7, 0.6]
     assert add_extra_facts(top, ranked, n=1, ratio=0.6)[2:] == [ranked[2]]
     assert add_extra_facts(top, ranked, n=0, ratio=0.6) == top
+
+
+@pytest.mark.parametrize(
+    ("question", "searched"),
+    [
+        ("How many plants did I acquire in the last month?", "How many plants did I acquire?"),
+        ("How many MCU films did I watch in the last 3 months?", "How many MCU films did I watch?"),
+        (
+            "Which platform did I gain the most followers on over the past month?",
+            "Which platform did I gain the most followers on?",
+        ),
+        ("What certification did I complete last month?", "What certification did I complete?"),
+        (
+            "I mentioned a sports event two weeks ago. What was the event?",
+            "I mentioned a sports event. What was the event?",
+        ),
+        # ranges keep their phrase: the window only covers one end
+        (
+            "Which rides did I take from July to October?",
+            "Which rides did I take from July to October?",
+        ),
+        (
+            "Which airline did I fly in March and April?",
+            "Which airline did I fly in March and April?",
+        ),
+        # nothing left to search for: keep the question
+        ("Anything last month?", "Anything last month?"),
+    ],
+)
+def test_the_time_phrase_is_left_out_of_the_search(question, searched):
+    from app.memory.retriever import without_time_phrase
+    from app.memory.temporal import parse_time_window
+
+    window = parse_time_window(question, datetime(2023, 6, 15, tzinfo=UTC))
+    assert window is not None
+    assert without_time_phrase(question, window) == searched
+
+
+def test_no_window_no_change():
+    from app.memory.retriever import without_time_phrase
+
+    assert without_time_phrase("How many plants do I have?", None) == "How many plants do I have?"

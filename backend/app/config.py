@@ -83,6 +83,7 @@ class Settings(BaseSettings):
     retrieval_extra_facts: int = 10  # more facts after the top k, for counting questions
     retrieval_split_queries: bool = True  # search each side of "A or B" separately too
     retrieval_split_slots: int = 2
+    retrieval_strip_time_phrase: bool = False  # search without "in the last month" etc.
     # v2 adds near-miss, counting and comparison rules. Dev at temperature 0: 75% vs 70%
     # for v1 (one counting question fixed, none broken). Baselines use the same version.
     responder_prompt: Literal["v1", "v2"] = "v2"
@@ -167,6 +168,7 @@ class Settings(BaseSettings):
             extra_facts=self.retrieval_extra_facts,
             split_queries=self.retrieval_split_queries,
             split_slots=self.retrieval_split_slots,
+            strip_time_phrase=self.retrieval_strip_time_phrase,
         )
 
     @property

@@ -260,6 +260,7 @@ def run_fingerprint(cfg: RunConfig, es: EvalSettings, s: Settings, clients: Clie
                 "retrieval_extra_facts",
                 "retrieval_split_queries",
                 "retrieval_split_slots",
+                "retrieval_strip_time_phrase",
                 "responder_prompt",
                 "responder_temperature",
                 "context_budget_chars",
@@ -318,6 +319,7 @@ ADDED_BACKEND_KEYS: dict[str, Any] = {
     "retrieval_extra_facts": 0,
     "retrieval_split_queries": False,
     "retrieval_split_slots": 2,
+    "retrieval_strip_time_phrase": False,
     "responder_prompt": "v1",
     "responder_temperature": 0.2,
 }

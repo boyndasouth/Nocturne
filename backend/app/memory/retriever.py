@@ -26,6 +26,8 @@ Two options (Phase 4, off by default) for questions one ranked list serves badly
 - split_queries: a comparison ("the thermostat or the mesh network?", "between A and B")
   is also searched one side at a time, and each side's best notes are kept. Otherwise the
   side that matches the question's wording better fills every slot.
+- strip_time_phrase: once "in the last month" has become a time window, search without it.
+  Otherwise its words rank notes that merely say "last month" above notes about the topic.
 """
 
 from __future__ import annotations
@@ -83,6 +85,7 @@ class RetrievalConfig:
     extra_facts: int = 0  # more facts after the top k (score >= fact_slot_ratio x the best)
     split_queries: bool = False  # search each side of "A or B" / "between A and B" too
     split_slots: int = 2  # best notes kept per side
+    strip_time_phrase: bool = False  # search without the phrase a time window came from
 
 
 # "A or B", "A vs B": the left side starts after the last comma / colon / "between".
@@ -100,6 +103,27 @@ _EMPTY_SIDES = {
     "not", "no", "so", "else", "something", "anything", "nothing", "other", "others",
     "this", "that", "these", "those", "one", "ones", "them", "the",
 }  # fmt: skip
+
+
+_LEAD_IN_RE = r"(?:\b(?:in|over|during|within|from|since|for|of|on|at)\s+)?(?:\bthe\s+)?"
+# "from July to October": the window came from one end of a range; leave ranges alone.
+_RANGE_AFTER_RE = re.compile(r"\s+(?:to|until|till|through|and)\b", re.I)
+
+
+def without_time_phrase(query: str, window: TimeWindow | None) -> str:
+    """The query minus the phrase its time window came from (and a preposition before it):
+    "How many plants did I acquire in the last month?" -> "How many plants did I acquire?"
+    Returns the query unchanged if nothing is left worth searching for."""
+    if window is None or not window.phrase.strip():
+        return query
+    m = re.search(_LEAD_IN_RE + re.escape(window.phrase.strip()), query, flags=re.I)
+    if m is None or _RANGE_AFTER_RE.match(query, m.end()):
+        return query
+    out = query[: m.start()] + " " + query[m.end() :]
+    out = re.sub(r"\s+([?.!,;:])", r"\1", re.sub(r"\s{2,}", " ", out)).strip(" ,;:")
+    if len(re.findall(r"[A-Za-z]{3,}", out)) < 2:
+        return query
+    return out
 
 
 def split_query(query: str) -> list[str]:
@@ -253,9 +277,10 @@ class HierarchicalRetriever:
         with self._tracer.observe("retrieve", as_type="retriever", input={"query": query}) as obs:
             window = parse_time_window(query, now) if cfg.temporal else None
             self.last_window = window
-            sides = split_query(query) if cfg.split_queries else []
+            text = without_time_phrase(query, window) if cfg.strip_time_phrase else query
+            sides = split_query(text) if cfg.split_queries else []
             searches = [self._search(q, k=k, now=now, as_of=as_of, tiers=tiers, window=window)
-                        for q in [query, *sides]]  # fmt: skip
+                        for q in [text, *sides]]  # fmt: skip
             (result, candidates, fallback), *side_results = await asyncio.gather(*searches)
 
             themes = [s for s in result if s.note.tier is Tier.THEME][: cfg.theme_k]
@@ -287,6 +312,7 @@ class HierarchicalRetriever:
                     else None,
                     "fallback": fallback,
                     "split": sides or None,
+                    "search_text": text if text != query else None,
                 },
             )
             return ranked
