@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     retrieval_strip_time_phrase: bool = True  # search without "in the last month" etc.
     # v2 adds near-miss, counting and comparison rules. Dev at temperature 0: 75% vs 70%
     # for v1 (one counting question fixed, none broken). Baselines use the same version.
-    responder_prompt: Literal["v1", "v2"] = "v2"
+    responder_prompt: Literal["v1", "v2", "v3"] = "v2"  # v3: + advice/recommendation rules
     responder_temperature: float = 0.2  # the eval answers at EVAL_ANSWER_TEMPERATURE (0)
     # Memory block given to the answer model; the eval's naive-RAG baseline gets the same.
     context_budget_chars: int = 12_000

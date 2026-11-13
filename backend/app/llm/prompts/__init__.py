@@ -43,19 +43,34 @@ _RESPONDER_V2_ANCHOR = """
 - For general knowledge questions"""
 
 
+# RESPONDER_PROMPT=v3: v2 plus rules for advice and recommendations. Dev preference misses
+# listed every interest in memory instead of the ones about the thing asked, and ignored a
+# directly relevant memory. Examples are deliberately unrelated to benchmark questions.
+_RESPONDER_V3_RULES = """
+- For recommendations and advice, first find the memories about the thing asked: what the \
+user has done, liked, asked for or said about that same activity, subject or place (for \
+"what should I cook tonight", their cooking and the dishes they've mentioned; for "should \
+I go to my cousin's wedding", what they've said about that cousin and family events). \
+Build the answer on those, and say which memory each suggestion comes from.
+- Lead with the user's most specific stated preference for that thing (a format, platform, \
+style or goal they named), and respect what they said they want to avoid or move away from.
+- Don't pad the answer with suggestions drawn from unrelated interests. A few well-matched \
+suggestions beat a list that covers everything in memory. If no memory is about the thing \
+asked, say so briefly and give general advice."""
+
+
 def responder_system(version: str = "v1") -> str:
     """The Responder's system prompt. Baselines answer with the same version, so a prompt
     change never counts as a memory improvement."""
     if version == "v1":
         return RESPONDER_SYSTEM
-    if version == "v2":
-        return RESPONDER_SYSTEM.replace(
-            _RESPONDER_V2_ANCHOR, _RESPONDER_V2_RULES + _RESPONDER_V2_ANCHOR, 1
-        )
+    if version in ("v2", "v3"):
+        rules = _RESPONDER_V2_RULES + (_RESPONDER_V3_RULES if version == "v3" else "")
+        return RESPONDER_SYSTEM.replace(_RESPONDER_V2_ANCHOR, rules + _RESPONDER_V2_ANCHOR, 1)
     raise ValueError(f"unknown responder prompt version {version!r}")
 
 
-RESPONDER_SYSTEMS = frozenset(responder_system(v) for v in ("v1", "v2"))
+RESPONDER_SYSTEMS = frozenset(responder_system(v) for v in ("v1", "v2", "v3"))
 
 RESPONDER_USER = """\
 Current time: {now}

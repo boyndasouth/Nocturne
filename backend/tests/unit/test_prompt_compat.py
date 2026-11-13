@@ -71,6 +71,10 @@ def test_responder_v1_is_unchanged_and_v2_only_adds_rules():
     assert v2.replace(added, "") == RESPONDER_SYSTEM
     for rule in ("exactly what was asked", '"how many"', '"which came first"'):
         assert rule in added
-    assert len(RESPONDER_SYSTEMS) == 2
+    assert len(RESPONDER_SYSTEMS) == 3
+    v3 = responder_system("v3")
+    extra = v3[v3.index("\n- For recommendations") : v3.index("\n- For general knowledge")]
+    assert v3.replace(extra, "") == v2  # v3 = v2 + the advice rules, nothing else
+    assert "most specific stated preference" in extra
     with pytest.raises(ValueError):
-        responder_system("v3")
+        responder_system("v9")
