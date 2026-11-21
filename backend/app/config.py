@@ -19,7 +19,19 @@ class Settings(BaseSettings):
 
     # --- Core -------------------------------------------------------------------------------
     database_url: str = Field(..., description="Postgres URL (Supabase session pooler or Neon).")
-    api_key: SecretStr | None = Field(None, description="If set, required in the X-API-Key header.")
+    api_key: SecretStr | None = Field(
+        None,
+        description="AUTH_MODE=none: if set, required in the X-API-Key header. "
+        "AUTH_MODE=supabase: the service key for jobs across accounts (POST /sleep/all).",
+    )
+    # Accounts. "none": one memory, owner 'local' (local dev, evals, tests). "supabase": each
+    # signed-in Supabase user gets their own memory, enforced by row-level security.
+    auth_mode: Literal["none", "supabase"] = "none"
+    supabase_url: str | None = Field(None, description="https://<project>.supabase.co")
+    supabase_jwt_secret: SecretStr | None = Field(
+        None, description="Only for projects still on the legacy shared JWT secret (HS256)."
+    )
+    supabase_audience: str = "authenticated"
     cors_origins: str = Field(
         "http://localhost:5173,http://127.0.0.1:5173",
         description="Comma-separated browser origins allowed to call the API (the frontend's"

@@ -5,9 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from pydantic import AwareDatetime, BaseModel, Field
 
-from app.api.deps import ContainerDep, require_api_key
+from app.api.deps import ContainerDep, require_user
 
-router = APIRouter(tags=["ingest"], dependencies=[Depends(require_api_key)])
+router = APIRouter(tags=["ingest"], dependencies=[Depends(require_user)])
 
 
 class IngestRequest(BaseModel):

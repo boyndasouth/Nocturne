@@ -8,6 +8,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from app.config import Settings
+from app.owner import ScopedPool
 
 
 class SchemaError(RuntimeError):
@@ -19,16 +20,30 @@ async def _configure(conn: psycopg.AsyncConnection) -> None:
     await conn.commit()  # the pool requires connections to be returned idle
 
 
-def create_pool(settings: Settings) -> AsyncConnectionPool:
+async def _configure_scoped(conn: psycopg.AsyncConnection) -> None:
+    """Accounts on: also let filtered vector searches keep scanning past other owners' rows
+    (pgvector 0.8+); without it an HNSW scan can return too few of this owner's notes."""
+    await register_vector_async(conn)
+    cur = await conn.execute("select extversion from pg_extension where extname = 'vector'")
+    row = await cur.fetchone()
+    version = tuple(int(p) for p in str(row["extversion"]).split(".")[:2]) if row else (0, 0)
+    if version >= (0, 8):
+        await conn.execute("select set_config('hnsw.iterative_scan', 'relaxed_order', false)")
+    await conn.commit()
+
+
+def create_pool(settings: Settings) -> ScopedPool:
     # prepare_threshold=None: server-side prepared statements break behind PgBouncer-style
     # transaction poolers (Supabase port 6543, Neon "-pooler" hosts). Disabling them costs
     # little at this scale and makes any connection string safe.
-    return AsyncConnectionPool(
+    scoped = settings.auth_mode == "supabase"
+    return ScopedPool(
+        scoped=scoped,
         conninfo=settings.database_url,
         min_size=settings.db_pool_min,
         max_size=settings.db_pool_max,
         open=False,
-        configure=_configure,
+        configure=_configure_scoped if scoped else _configure,
         check=AsyncConnectionPool.check_connection,  # free tiers drop idle connections
         kwargs={"prepare_threshold": None, "row_factory": dict_row},
         name="nocturne",
@@ -77,6 +92,16 @@ async def verify_schema(database_url: str, expected_dim: int) -> None:
             raise SchemaError(
                 "The database is missing migration 005 (forgetting from the UI). "
                 "Run `python -m scripts.migrate`."
+            )
+        owners = await (
+            await conn.execute(
+                "select 1 from pg_attribute where attrelid = to_regclass('memory_notes')"
+                " and attname = 'owner_id'"
+            )
+        ).fetchone()
+        if owners is None:
+            raise SchemaError(
+                "The database is missing migration 006 (accounts). Run `python -m scripts.migrate`."
             )
         if row["dim"] != expected_dim:
             raise SchemaError(

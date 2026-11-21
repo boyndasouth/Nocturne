@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -39,6 +39,15 @@ class ChatResult:
     retrieved: list[ScoredNote]
     episode_id: UUID | None  # None when respond(remember=False)
     context: str = ""  # the memory block the LLM saw (eval logs its size)
+    # For the answer trace: the exact messages sent, the ref each note got, and usage.
+    messages: list[ChatMessage] = field(default_factory=list)
+    refs: dict[UUID, str] = field(default_factory=dict)
+    recent_turns: int = 0
+    history_notes: int = 0
+    model: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    latency_ms: float = 0.0
 
 
 def _label(ref: int, note: MemoryNote) -> str:
@@ -228,4 +237,12 @@ class Responder:
                 retrieved=retrieved,
                 episode_id=episode_id,
                 context=memories,
+                messages=messages,
+                refs={note_id: f"M{ref}" for ref, note_id in refmap.items()},
+                recent_turns=len(recent),
+                history_notes=sum(len(v) for v in history.values()),
+                model=resp.model,
+                input_tokens=resp.input_tokens,
+                output_tokens=resp.output_tokens,
+                latency_ms=resp.latency_ms,
             )

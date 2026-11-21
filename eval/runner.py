@@ -64,6 +64,7 @@ def backend_settings(eval_settings: EvalSettings, *, fake: bool) -> Settings:
     trigger off. Fake runs use the hash embedder so no model download is needed."""
     overrides: dict[str, Any] = {
         "sleep_auto": False,
+        "auth_mode": "none",  # one memory; evals never go through accounts
         "responder_temperature": eval_settings.answer_temperature,
     }
     # Never fall back to the app's DATABASE_URL: the eval database is wiped constantly.

@@ -120,8 +120,10 @@ class MemoryStore:
         self._pool = pool
 
     async def ping(self) -> bool:
+        """Database reachable? Needs no account, so it uses an unscoped connection."""
+        admin = getattr(self._pool, "admin_connection", self._pool.connection)
         try:
-            async with self._pool.connection(timeout=5) as conn:
+            async with admin(timeout=5) as conn:
                 await conn.execute("select 1")
             return True
         except Exception:
@@ -503,6 +505,19 @@ class MemoryStore:
             )
             rows = await cur.fetchall()
         return [_note(r) for r in rows]
+
+    async def pending_by_owner(self) -> dict[str, int]:
+        """Unconsolidated turns per owner, across every account (for the sleep trigger and
+        the cron). Uses an unscoped connection; nothing else should."""
+        admin = getattr(self._pool, "admin_connection", self._pool.connection)
+        async with admin() as conn:
+            cur = await conn.execute(
+                "select owner_id, count(*) as n from memory_notes"
+                " where tier = 'episode' and consolidated_in is null and status = 'active'"
+                " group by owner_id order by owner_id"
+            )
+            rows = await cur.fetchall()
+        return {r["owner_id"]: int(r["n"]) for r in rows}
 
     async def count_pending_episodes(self) -> int:
         async with self._pool.connection() as conn:

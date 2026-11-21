@@ -9,13 +9,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import AwareDatetime, BaseModel, Field
 
-from app.api.deps import ContainerDep, require_api_key
+from app.api.deps import Container, ContainerDep, require_service, require_user
 from app.llm.providers import ConfigError
 from app.memory.cycles import SleepBusy, SleepCycle
+from app.owner import owner_scope
 
 log = logging.getLogger("nocturne.sleep")
 
-router = APIRouter(tags=["sleep"], dependencies=[Depends(require_api_key)])
+router = APIRouter(tags=["sleep"], dependencies=[Depends(require_user)])
 
 # Strong references to background cycles; asyncio only keeps weak ones.
 _background: set[asyncio.Task[object]] = set()
@@ -118,3 +119,50 @@ async def get_cycle(cycle_id: UUID, c: ContainerDep) -> CycleOut:
     if cycle is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "cycle not found")
     return CycleOut.of(cycle)
+
+
+# --- across accounts (the GitHub Actions cron) ---------------------------------------------
+
+service_router = APIRouter(tags=["sleep"])
+
+
+class SleepAllResponse(BaseModel):
+    started: int = Field(description="Accounts whose sleep cycle was started")
+    busy: int = Field(description="Accounts already sleeping")
+    failed: int = Field(description="Accounts whose cycle couldn't start (see the server log)")
+
+
+async def _sleep_owners(c: Container, owners: list[str]) -> SleepAllResponse:
+    out = SleepAllResponse(started=0, busy=0, failed=0)
+    for owner in owners:
+        with owner_scope(owner):
+            try:
+                prepared = await c.sleep_runner.begin()
+            except SleepBusy:
+                out.busy += 1
+                continue
+            except Exception:
+                log.exception("couldn't start a sleep cycle for an account")
+                out.failed += 1
+                continue
+            if prepared is None:
+                continue
+            # One account at a time: free-tier rate limits, and a cycle is cheap to wait for.
+            try:
+                await c.sleep_runner.execute(prepared)
+                out.started += 1
+            except Exception:
+                out.failed += 1
+    return out
+
+
+@service_router.post(
+    "/sleep/all",
+    response_model=SleepAllResponse,
+    dependencies=[Depends(require_service)],
+)
+async def sleep_all(c: ContainerDep) -> SleepAllResponse:
+    """Sleep every account that has conversation turns waiting, one after another. For the
+    scheduled job, with the service key (X-API-Key). Runs to completion."""
+    pending = await c.store.pending_by_owner()
+    return await _sleep_owners(c, sorted(pending))

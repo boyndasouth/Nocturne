@@ -101,6 +101,7 @@ def make_client(fresh_db: str) -> Iterator[Callable[..., TestClient]]:
         llm: FakeLLM | None = None, sleep_llm: FakeLLM | None = None, **overrides: object
     ) -> TestClient:
         overrides.setdefault("sleep_auto", False)
+        verifier = overrides.pop("verifier", None)
         settings = Settings(
             database_url=fresh_db, embedding_backend="hash", _env_file=None, **overrides
         )
@@ -110,6 +111,7 @@ def make_client(fresh_db: str) -> Iterator[Callable[..., TestClient]]:
             sleep_llm=sleep_llm,
             embedder=HashEmbedder(),
             tracer=Tracer(),
+            verifier=verifier,  # type: ignore[arg-type]
         )
         client = make_test_client(app)
         client.__enter__()  # run lifespan

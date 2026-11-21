@@ -11,12 +11,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.api.deps import ContainerDep, require_api_key
+from app.api.deps import ContainerDep, require_user
 from app.memory.curation import Curation, CurationError
 from app.memory.explorer import MemoryExplorer
 from app.memory.models import LinkType, MemoryNote, Status, Tier
 
-router = APIRouter(tags=["memory"], dependencies=[Depends(require_api_key)])
+router = APIRouter(tags=["memory"], dependencies=[Depends(require_user)])
 
 
 def get_explorer(c: ContainerDep) -> MemoryExplorer:

@@ -27,14 +27,15 @@ from app.agents.sleep.runner import (
     postgres_checkpointer,
 )
 from app.agents.sleep.trigger import ActivityClock, IdleTrigger, TriggerPolicy
-from app.api import chat, health, ingest, memory, sleep
+from app.api import account, chat, health, ingest, memory, sleep
 from app.api.deps import Container
+from app.auth import SupabaseVerifier
 from app.config import Settings, get_settings
 from app.db import create_pool, verify_schema
 from app.eventloop import check_loop_compatible
 from app.llm.client import LLMClient
 from app.llm.embeddings import Embedder, build_embedder
-from app.llm.providers import build_online_client, build_sleep_client
+from app.llm.providers import ConfigError, build_online_client, build_sleep_client
 from app.llm.tracing import Tracer, build_tracer
 from app.memory.cycles import CycleStore
 from app.memory.retriever import HierarchicalRetriever
@@ -51,10 +52,21 @@ def create_app(
     embedder: Embedder | None = None,
     tracer: Tracer | None = None,
     checkpointer: CheckpointerFactory | None = None,
+    verifier: SupabaseVerifier | None = None,
 ) -> FastAPI:
-    """Pass `llm`, `sleep_llm`, `embedder`, `tracer` or `checkpointer` to override the
-    configured ones (used by tests)."""
+    """Pass `llm`, `sleep_llm`, `embedder`, `tracer`, `checkpointer` or `verifier` to
+    override the configured ones (used by tests)."""
     settings = settings or get_settings()
+    if settings.auth_mode == "supabase" and verifier is None:
+        if not settings.supabase_url:
+            raise ConfigError("AUTH_MODE=supabase needs SUPABASE_URL")
+        verifier = SupabaseVerifier(
+            settings.supabase_url,
+            audience=settings.supabase_audience,
+            jwt_secret=settings.supabase_jwt_secret.get_secret_value()
+            if settings.supabase_jwt_secret
+            else None,
+        )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -143,6 +155,7 @@ def create_app(
             cycles=cycles,
             sleep_runner=runner,
             activity=activity,
+            verifier=verifier if settings.auth_mode == "supabase" else None,
         )
 
         warmup = getattr(embedder_, "warmup", None)
@@ -151,8 +164,9 @@ def create_app(
         if settings.sleep_auto:
             trigger.start()
         log.info(
-            "Nocturne %s ready (tracing=%s, auto-sleep=%s)",
+            "Nocturne %s ready (accounts=%s, tracing=%s, auto-sleep=%s)",
             __version__,
+            settings.auth_mode,
             tracer_.enabled,
             settings.sleep_auto,
         )
@@ -172,14 +186,16 @@ def create_app(
     app.include_router(chat.router)
     app.include_router(ingest.router)
     app.include_router(sleep.router)
+    app.include_router(sleep.service_router)
     app.include_router(memory.router)
+    app.include_router(account.router)
     origins = [o.strip().rstrip("/") for o in settings.cors_origins.split(",") if o.strip()]
     if origins:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=origins,
             allow_methods=["GET", "POST"],
-            allow_headers=["Content-Type", "X-API-Key"],
+            allow_headers=["Content-Type", "X-API-Key", "Authorization"],
             max_age=600,
         )
     return app

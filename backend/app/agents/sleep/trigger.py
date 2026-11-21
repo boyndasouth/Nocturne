@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from app.agents.sleep.runner import SleepRunner
 from app.memory.cycles import SleepBusy
 from app.memory.store import MemoryStore
+from app.owner import current_owner, owner_scope
 
 log = logging.getLogger("nocturne.sleep")
 
@@ -36,17 +37,19 @@ def should_sleep(pending: int, idle_seconds: float, p: TriggerPolicy) -> bool:
 
 
 class ActivityClock:
-    """Last time the user did something. Updated by /chat and /ingest."""
+    """Last time each owner did something. Updated by /chat and /ingest. An owner this
+    process hasn't seen counts as idle since it started."""
 
     def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self._clock = clock
-        self._last = clock()
+        self._start = clock()
+        self._last: dict[str, float] = {}
 
     def touch(self) -> None:
-        self._last = self._clock()
+        self._last[current_owner()] = self._clock()
 
-    def idle_seconds(self) -> float:
-        return self._clock() - self._last
+    def idle_seconds(self, owner: str | None = None) -> float:
+        return self._clock() - self._last.get(owner or current_owner(), self._start)
 
 
 class IdleTrigger:
@@ -62,8 +65,8 @@ class IdleTrigger:
         self._activity = activity
         self._policy = policy
         self._task: asyncio.Task[None] | None = None
-        self._failures = 0
-        self._next_try = 0.0
+        self._failures: dict[str, int] = {}
+        self._next_try: dict[str, float] = {}
 
     def start(self) -> None:
         if self._task is None:
@@ -79,21 +82,28 @@ class IdleTrigger:
             self._task = None
 
     async def tick(self) -> bool:
-        """One check. Returns True if a cycle ran (successfully or not)."""
-        if self._runner.busy or time.monotonic() < self._next_try:
+        """One check across every owner with waiting turns, one cycle at a time. Returns True
+        if a cycle ran (successfully or not)."""
+        ran = False
+        for owner, pending in (await self._store.pending_by_owner()).items():
+            with owner_scope(owner):
+                ran = await self._tick_owner(owner, pending) or ran
+        return ran
+
+    async def _tick_owner(self, owner: str, pending: int) -> bool:
+        if self._runner.busy or time.monotonic() < self._next_try.get(owner, 0.0):
             return False
-        pending = await self._store.count_pending_episodes()
-        if not should_sleep(pending, self._activity.idle_seconds(), self._policy):
+        if not should_sleep(pending, self._activity.idle_seconds(owner), self._policy):
             return False
         try:
             await self._runner.run_once()
-            self._failures = 0
+            self._failures.pop(owner, None)
         except SleepBusy:
             return False
         except Exception:  # logged by the runner; back off so a quota error isn't hammered
-            self._failures += 1
-            delay = self._policy.retry_backoff_seconds * 2 ** min(self._failures - 1, 5)
-            self._next_try = time.monotonic() + delay
+            failures = self._failures[owner] = self._failures.get(owner, 0) + 1
+            delay = self._policy.retry_backoff_seconds * 2 ** min(failures - 1, 5)
+            self._next_try[owner] = time.monotonic() + delay
             log.warning("idle-triggered sleep failed; next attempt in %.0fs", delay)
         return True
 

@@ -158,10 +158,14 @@ def emb(embedder: Embedder, text: str) -> list[float]:
     return embedder.embed_documents([text])[0]
 
 
-def seed(url: str, embedder: Embedder, *, wipe: bool) -> None:
+def seed(url: str, embedder: Embedder, *, wipe: bool, owner: str = "local") -> None:
     migrate(url, verbose=False)
     with psycopg.connect(url, row_factory=dict_row) as conn:
-        n = conn.execute("select count(*) as n from memory_notes").fetchone()
+        # Rows default to this owner (migration 006); 'local' is the accounts-off memory.
+        conn.execute("select set_config('nocturne.owner', %s, false)", (owner,))
+        n = conn.execute(
+            "select count(*) as n from memory_notes where owner_id = %s", (owner,)
+        ).fetchone()
         if n and n["n"]:
             dbname = conn.info.dbname
             if not wipe or "demo" not in dbname:
@@ -344,7 +348,7 @@ def seed(url: str, embedder: Embedder, *, wipe: bool) -> None:
             (at(3, 5), [facts["dallas"], facts["veg"], facts["mornings"]]),
         )
         conn.commit()
-        print(f"seeded {len(facts)} facts, 2 themes and {len(cycles)} sleep cycles into {url}")
+        print(f"seeded {len(facts)} facts, 2 themes and {len(cycles)} sleep cycles for {owner}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -352,6 +356,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("database_url")
     p.add_argument("--wipe", action="store_true", help="empty a *demo* database first")
     p.add_argument("--hash", action="store_true", help="hash embeddings (no model download)")
+    p.add_argument(
+        "--owner",
+        default="local",
+        help="whose memory to fill: 'local' (accounts off) or a Supabase user id",
+    )
     args = p.parse_args(argv)
     if args.hash:
         embedder: Embedder = HashEmbedder()
@@ -360,7 +369,7 @@ def main(argv: list[str] | None = None) -> int:
         from app.llm.embeddings import build_embedder
 
         embedder = build_embedder(Settings(database_url=args.database_url))
-    seed(args.database_url, embedder, wipe=args.wipe)
+    seed(args.database_url, embedder, wipe=args.wipe, owner=args.owner)
     return 0
 
 

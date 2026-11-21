@@ -174,3 +174,18 @@ def test_a_turn_forgotten_before_sleep_is_never_learned(make_client, fresh_db):
     assert client.get("/memory/stats").json()["pending_episodes"] == 0
     assert sleep(client, JAN_SLEEP)["status"] == "nothing_to_do"
     assert client.get("/memory/notes").json()["total"] == 0
+
+
+def test_chat_returns_an_answer_trace(make_client, fresh_db):
+    client, _, _ = _two_nights(make_client)
+    r = chat(client, "Where do I live?", MAR.replace(day=20))
+    t = r["trace"]
+    assert t["model"] == "fake-model" and t["input_tokens"] >= 0
+    [system, user] = t["messages"]
+    assert system["role"] == "system" and user["role"] == "user"
+    assert "Where do I live?" in user["content"]
+    dallas = next(m for m in t["memories"] if m["content"] == "The user lives in Dallas.")
+    assert dallas["via"] == "search" and dallas["status"] == "active"
+    assert dallas["ref"] and f"[{dallas['ref']}]" in user["content"]  # it was in the prompt
+    assert dallas["score"] > 0 and 0 <= dallas["semantic"] <= 1
+    assert [m["id"] for m in t["memories"]] == [m["id"] for m in r["retrieved"]]

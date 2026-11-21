@@ -29,6 +29,7 @@ from app.llm.embeddings import Embedder
 from app.llm.tracing import Tracer
 from app.memory.cycles import CycleStore, SleepBusy, SleepCycle
 from app.memory.store import MemoryStore
+from app.owner import current_owner
 
 log = logging.getLogger("nocturne.sleep")
 
@@ -85,11 +86,12 @@ class SleepRunner:
         self._config = config
         self._limits = limits
         self._tracer = tracer or Tracer()
-        self._busy = False
+        self._busy: set[str] = set()  # owners with a cycle in this process
 
     @property
     def busy(self) -> bool:
-        return self._busy
+        """Whether the current owner has a cycle running in this process."""
+        return current_owner() in self._busy
 
     def _get_llm(self) -> LLMClient:
         if self._llm is None:
@@ -104,9 +106,10 @@ class SleepRunner:
         """Claim work. Returns None when there's nothing to consolidate. Raises SleepBusy if a
         cycle is already running, here or in another process. `clock` (benchmark replay) sets
         the cycle's notion of now; a resumed cycle keeps its original clock."""
-        if self._busy:
+        owner = current_owner()
+        if owner in self._busy:
             raise SleepBusy("a sleep cycle is already running in this process")
-        self._busy = True
+        self._busy.add(owner)
         try:
             self._get_llm()  # fail before claiming anything if the sleep LLM isn't configured
             stale = self._limits.stale_after
@@ -123,12 +126,12 @@ class SleepRunner:
                 before=now, limit=self._limits.max_episodes
             )
             if not episodes:
-                self._busy = False
+                self._busy.discard(owner)
                 return None
             cycle = await self._cycles.create([e.id for e in episodes], now)
             return PreparedCycle(cycle, resumed=False)
         except BaseException:
-            self._busy = False
+            self._busy.discard(owner)
             raise
 
     async def execute(self, prepared: PreparedCycle) -> SleepCycle:
@@ -136,6 +139,7 @@ class SleepRunner:
         its checkpoint kept for resume) and the error is re-raised."""
         cycle = prepared.cycle
         cycle_id = cycle.cycle_id
+        owner = current_owner()
         config: dict[str, Any] = {
             "configurable": {"thread_id": str(cycle_id)},
             "recursion_limit": self._limits.recursion_limit,
@@ -178,7 +182,7 @@ class SleepRunner:
                 log.exception("could not mark cycle %s failed", cycle_id)
             raise
         finally:
-            self._busy = False
+            self._busy.discard(owner)
             self._tracer.flush()
         done = await self._cycles.get(cycle_id)
         assert done is not None
