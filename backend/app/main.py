@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from datetime import timedelta
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.agents.episode_writer import EpisodeWriter
@@ -26,7 +27,7 @@ from app.agents.sleep.runner import (
     postgres_checkpointer,
 )
 from app.agents.sleep.trigger import ActivityClock, IdleTrigger, TriggerPolicy
-from app.api import chat, health, ingest, sleep
+from app.api import chat, health, ingest, memory, sleep
 from app.api.deps import Container
 from app.config import Settings, get_settings
 from app.db import create_pool, verify_schema
@@ -171,4 +172,14 @@ def create_app(
     app.include_router(chat.router)
     app.include_router(ingest.router)
     app.include_router(sleep.router)
+    app.include_router(memory.router)
+    origins = [o.strip().rstrip("/") for o in settings.cors_origins.split(",") if o.strip()]
+    if origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_methods=["GET", "POST"],
+            allow_headers=["Content-Type", "X-API-Key"],
+            max_age=600,
+        )
     return app

@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     # --- Core -------------------------------------------------------------------------------
     database_url: str = Field(..., description="Postgres URL (Supabase session pooler or Neon).")
     api_key: SecretStr | None = Field(None, description="If set, required in the X-API-Key header.")
+    cors_origins: str = Field(
+        "http://localhost:5173,http://127.0.0.1:5173",
+        description="Comma-separated browser origins allowed to call the API (the frontend's"
+        " URL, e.g. https://nocturne.vercel.app). Empty disables CORS.",
+    )
     db_pool_min: int = 1
     db_pool_max: int = 5
 
