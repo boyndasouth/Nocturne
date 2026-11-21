@@ -1,5 +1,6 @@
-"""Read-only memory explorer endpoints for the frontend: notes, a note's history and links,
-the memory graph, and what a sleep cycle changed ("what changed overnight")."""
+"""Memory explorer endpoints for the frontend: notes, a note's history and links, the memory
+graph, what a sleep cycle changed ("what changed overnight"), and the two changes a person
+can make themselves: correct a memory, or forget it."""
 
 from __future__ import annotations
 
@@ -8,9 +9,10 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.deps import ContainerDep, require_api_key
+from app.memory.curation import Curation, CurationError
 from app.memory.explorer import MemoryExplorer
 from app.memory.models import LinkType, MemoryNote, Status, Tier
 
@@ -232,3 +234,48 @@ async def cycle_changes(
         links=[CycleLinkOut.model_validate(r) for r in d["links"]],
         audit=d["audit"],
     )
+
+
+# --- changes made by the person ------------------------------------------------------------
+
+
+def get_curation(c: ContainerDep) -> Curation:
+    return Curation(c.pool, c.store, c.embedder)
+
+
+CurationDep = Annotated[Curation, Depends(get_curation)]
+
+
+class CorrectIn(BaseModel):
+    content: str = Field(min_length=1, max_length=1000)
+
+
+class ThemeRef(BaseModel):
+    id: UUID
+    content: str
+
+
+class ForgetOut(BaseModel):
+    note_id: UUID
+    turns_forgotten: int
+    themes: list[ThemeRef]  # active themes that still mention it
+
+
+@router.post("/memory/notes/{note_id}/correct", response_model=NoteOut)
+async def correct_note(note_id: UUID, body: CorrectIn, cur: CurationDep) -> NoteOut:
+    try:
+        return NoteOut.of(await cur.correct(note_id, body.content))
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "note not found") from exc
+    except CurationError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+
+@router.post("/memory/notes/{note_id}/forget", response_model=ForgetOut)
+async def forget_note(note_id: UUID, cur: CurationDep) -> ForgetOut:
+    try:
+        return ForgetOut.model_validate(await cur.forget(note_id))
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "note not found") from exc
+    except CurationError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc

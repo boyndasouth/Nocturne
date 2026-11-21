@@ -1,7 +1,7 @@
 // Typed client for the Nocturne backend. Shapes mirror backend/app/api/*.py.
 
 export type Tier = "episode" | "fact" | "theme";
-export type Status = "active" | "superseded" | "archived";
+export type Status = "active" | "superseded" | "archived" | "forgotten";
 export type LinkType =
   | "related"
   | "elaborates"
@@ -148,6 +148,12 @@ export interface ChatResponse {
   episode_id: string;
 }
 
+export interface ForgetResult {
+  note_id: string;
+  turns_forgotten: number;
+  themes: { id: string; content: string }[];
+}
+
 export interface SleepResponse {
   status: "nothing_to_do" | "started" | "succeeded" | "failed";
   resumed: boolean;
@@ -194,11 +200,13 @@ export class ApiError extends Error {
   }
 }
 
+const sentence = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}.`;
+
 export function explain(err: unknown, conn: Connection): string {
   if (err instanceof ApiError) {
     if (err.status === 401) return "The API key was refused. Enter the backend's API_KEY in Settings.";
     if (err.status === 404) return "Not found. It may belong to a different database.";
-    if (err.status === 409) return "A sleep cycle is already running. Wait for it to finish.";
+    if (err.status === 409) return sentence(err.message);
     if (err.status === 502 || err.status === 503)
       return `The backend couldn't reach its language model: ${err.message}`;
     return `The backend answered ${err.status}: ${err.message}`;
@@ -247,6 +255,12 @@ export function client(conn: Connection) {
     chat: (message: string) =>
       request<ChatResponse>("/chat", { method: "POST", body: JSON.stringify({ message }) }),
     sleep: () => request<SleepResponse>("/sleep", { method: "POST" }),
+    correct: (id: string, content: string) =>
+      request<Note>(`/memory/notes/${id}/correct`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      }),
+    forget: (id: string) => request<ForgetResult>(`/memory/notes/${id}/forget`, { method: "POST" }),
   };
 }
 

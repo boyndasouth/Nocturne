@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { explain, type Cycle, type CycleChanges } from "../api";
-import { day, dayTime, episodeQuote, linkPhrase, plural, useApp, useLoad } from "../lib";
+import { day, dayTime, episodeQuote, linkPhrase, plural, useApp, useLoad, useText } from "../lib";
 
 function summary(c: Cycle): string {
   if (c.status === "running") return "Sleeping now";
@@ -85,7 +85,7 @@ export function Nights({ selected }: { selected: string | null }) {
 }
 
 function NightDetail({ id, cycle }: { id: string; cycle?: Cycle }) {
-  const { api, conn, go, refreshKey } = useApp();
+  const { api, conn, go, refreshKey, dev } = useApp();
   const ch = useLoad(() => api.changes(id), [api, id, refreshKey]);
   if (ch.error) return <p className="error" role="alert">{explain(ch.error, conn)}</p>;
   if (!ch.data || !cycle) return <p className="muted">Loading the night</p>;
@@ -100,13 +100,15 @@ function NightDetail({ id, cycle }: { id: string; cycle?: Cycle }) {
       <header>
         <h1>The night of {day(d.clock)}</h1>
         <p className="lede">{prose(cycle, d)}</p>
-        <p className="fine">
-          {cycle.status === "running"
-            ? "Still running"
-            : `Took ${minutes ? plural(minutes, "minute") : "under a minute"}, ${plural(cycle.llm_calls, "model call")} and ${cycle.tokens_used.toLocaleString()} tokens.`}{" "}
-          Clock set to {dayTime(d.clock)}.
-        </p>
-        {cycle.error && (
+        {dev && (
+          <p className="fine">
+            {cycle.status === "running"
+              ? "Still running"
+              : `Took ${minutes ? plural(minutes, "minute") : "under a minute"}, ${plural(cycle.llm_calls, "model call")} and ${cycle.tokens_used.toLocaleString()} tokens.`}{" "}
+            Clock set to {dayTime(d.clock)}. Cycle {d.cycle_id}.
+          </p>
+        )}
+        {cycle.error && dev && (
           <p className="error" role="alert">
             {cycle.error}
           </p>
@@ -137,6 +139,7 @@ function prose(c: Cycle, d: CycleChanges): string {
 }
 
 function Changes({ d, open }: { d: CycleChanges; open: (id: string) => void }) {
+  const text = useText();
   const facts = d.created.filter((n) => n.tier === "fact");
   const themes = d.created.filter((n) => n.tier === "theme");
   const retired = d.edits.filter((e) => e.kind === "superseded");
@@ -160,11 +163,11 @@ function Changes({ d, open }: { d: CycleChanges; open: (id: string) => void }) {
               return (
                 <li key={e.note_id}>
                   <button className="row-button" onClick={() => open(e.note_id)}>
-                    <s>{e.before}</s>
+                    <s>{text(e.before)}</s>
                   </button>
                   {by && (
                     <button className="row-button now" onClick={() => open(by.src_id)}>
-                      {by.src_content}
+                      {text(by.src_content)}
                     </button>
                   )}
                 </li>
@@ -182,7 +185,7 @@ function Changes({ d, open }: { d: CycleChanges; open: (id: string) => void }) {
               <li key={n.id}>
                 <button className={`row-button ${n.status}`} onClick={() => open(n.id)}>
                   <span className="dot fact" aria-hidden="true" />
-                  {n.content}
+                  {text(n.content)}
                 </button>
               </li>
             ))}
@@ -198,7 +201,7 @@ function Changes({ d, open }: { d: CycleChanges; open: (id: string) => void }) {
               <li key={`${e.note_id}-${e.version}`}>
                 <button className="row-button" onClick={() => open(e.note_id)}>
                   <span className="dot fact" aria-hidden="true" />
-                  {e.after}
+                  {text(e.after)}
                 </button>
               </li>
             ))}
@@ -214,7 +217,7 @@ function Changes({ d, open }: { d: CycleChanges; open: (id: string) => void }) {
               <li key={n.id}>
                 <button className="row-button theme-text" onClick={() => open(n.id)}>
                   <span className="dot theme" aria-hidden="true" />
-                  {n.content}
+                  {text(n.content)}
                 </button>
                 <span className="fine">New</span>
               </li>
@@ -223,9 +226,9 @@ function Changes({ d, open }: { d: CycleChanges; open: (id: string) => void }) {
               <li key={`${e.note_id}-${e.version}`}>
                 <button className="row-button theme-text" onClick={() => open(e.note_id)}>
                   <span className="dot theme" aria-hidden="true" />
-                  {e.after}
+                  {text(e.after)}
                 </button>
-                <span className="fine">Revised. It used to say: {e.before}</span>
+                <span className="fine">Revised. It used to say: {text(e.before)}</span>
               </li>
             ))}
           </ul>
@@ -239,11 +242,11 @@ function Changes({ d, open }: { d: CycleChanges; open: (id: string) => void }) {
             {connections.map((l) => (
               <li key={`${l.src_id}-${l.dst_id}-${l.link_type}`}>
                 <button className="row-button" onClick={() => open(l.src_id)}>
-                  {l.src_content}
+                  {text(l.src_content)}
                 </button>
                 <span className="relation">{linkPhrase(l.link_type, "out").toLowerCase()}</span>
                 <button className="row-button" onClick={() => open(l.dst_id)}>
-                  {l.dst_content}
+                  {text(l.dst_content)}
                 </button>
               </li>
             ))}
@@ -264,7 +267,7 @@ function Changes({ d, open }: { d: CycleChanges; open: (id: string) => void }) {
             {archived.map((e) => (
               <li key={`${e.note_id}-${e.version}`}>
                 <button className="row-button archived" onClick={() => open(e.note_id)}>
-                  {e.before}
+                  {text(e.before)}
                 </button>
               </li>
             ))}
@@ -276,7 +279,7 @@ function Changes({ d, open }: { d: CycleChanges; open: (id: string) => void }) {
         <section className="change">
           <h2>Spot check</h2>
           <p className="muted">
-            A second model reviewed {plural(verdicts.length, "decision")} from this night.
+            A second model double-checked {plural(verdicts.length, "change")} from this night.
           </p>
           <ul className="verdicts">
             {verdicts.map((v) => (

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { explain, type ChatResponse } from "../api";
-import { tierName, useApp } from "../lib";
+import { day, episodeQuote, plural, store, stored, tierName, useApp, useLoad, useText } from "../lib";
 import { NotePanel } from "../components/NotePanel";
 
 type Msg =
@@ -57,6 +57,7 @@ export function Chat() {
   return (
     <div className={`chat ${open ? "with-drawer" : ""}`}>
       <section className="thread" aria-live="polite">
+        <SinceLastTime />
         {msgs.length === 0 ? (
           <div className="empty-chat">
             <h1>Tell it about your life. Ask it later.</h1>
@@ -139,6 +140,7 @@ function Answer({
   onCite: (id: string) => void;
   active: string | null;
 }) {
+  const text = useText();
   const byRef = new Map(res.citations.map((c) => [c.ref, c.note_id]));
   const order = [...byRef.keys()];
   const parts: ReactNode[] = [];
@@ -175,7 +177,7 @@ function Answer({
                 <button className="row-button" onClick={() => onCite(r.id)}>
                   <span className={`dot ${r.tier}`} aria-hidden="true" />
                   <span className="sr-only">{tierName[r.tier]}: </span>
-                  {r.preview}
+                  {r.tier === "episode" ? episodeQuote(r.preview) : text(r.preview)}
                 </button>
               </li>
             ))}
@@ -183,5 +185,44 @@ function Answer({
         </details>
       )}
     </>
+  );
+}
+
+/** "While you were away": the newest finished night the reader hasn't seen yet. */
+function SinceLastTime() {
+  const { api, go, refreshKey } = useApp();
+  const cycles = useLoad(() => api.cycles(20), [api, refreshKey]);
+  const [seen, setSeen] = useState(() => stored("nocturne.seenNight"));
+  const latest = (cycles.data ?? [])
+    .filter((c) => c.status === "succeeded")
+    .sort((a, b) => b.clock.localeCompare(a.clock))[0];
+  if (!latest || latest.cycle_id === seen) return null;
+  const changed = latest.supersessions + latest.merges + latest.themes_created + latest.themes_updated;
+  const dismiss = () => {
+    store("nocturne.seenNight", latest.cycle_id);
+    setSeen(latest.cycle_id);
+  };
+  return (
+    <aside className="since" aria-label="Since you last looked">
+      <p>
+        While you were away it slept on {day(latest.clock)}: it learned{" "}
+        {plural(latest.facts_created, "new thing")}
+        {changed > 0 && ` and updated ${plural(changed, "memory", "memories")}`}.
+      </p>
+      <div className="action-row">
+        <button
+          className="ghost"
+          onClick={() => {
+            dismiss();
+            go(`nights/${latest.cycle_id}`);
+          }}
+        >
+          See what changed
+        </button>
+        <button className="link-button" onClick={dismiss}>
+          Dismiss
+        </button>
+      </div>
+    </aside>
   );
 }

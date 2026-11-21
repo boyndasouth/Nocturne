@@ -89,7 +89,7 @@ def test_graph_and_cycle_changes(make_client, fresh_db):
     )
 
     stats = client.get("/memory/stats").json()
-    assert stats["notes"]["fact"] == {"active": 1, "superseded": 1, "archived": 0}
+    assert stats["notes"]["fact"] == {"active": 1, "superseded": 1, "archived": 0, "forgotten": 0}
     assert stats["cycles"] == 2 and stats["pending_episodes"] == 0
 
     missing = "00000000-0000-0000-0000-000000000000"
@@ -110,3 +110,67 @@ def test_memory_endpoints_require_the_api_key(make_client, fresh_db):
     client = make_client(api_key="s3cret")
     assert client.get("/memory/notes").status_code == 401
     assert client.get("/memory/graph", headers={"X-API-Key": "s3cret"}).status_code == 200
+
+
+def test_correcting_a_fact_is_a_versioned_edit(make_client, fresh_db):
+    client, _, _ = _two_nights(make_client)
+    dallas = client.get("/memory/notes", params={"q": "dallas"}).json()["items"][0]
+
+    r = client.post(
+        f"/memory/notes/{dallas['id']}/correct", json={"content": "  I live in Plano. "}
+    )
+    assert r.status_code == 200
+    assert r.json()["content"] == "I live in Plano." and r.json()["version"] == 2
+
+    d = client.get(f"/memory/notes/{dallas['id']}").json()
+    v1, v2 = d["history"]
+    assert v1["content"] == "The user lives in Dallas." and v2["content"] == "I live in Plano."
+    assert v1["ended"]["reason"] == "corrected by you" and v1["ended"]["cycle_id"] is None
+    # the new wording is what search finds
+    assert client.get("/memory/notes", params={"q": "plano"}).json()["total"] == 1
+
+    austin = client.get("/memory/notes", params={"status": "superseded"}).json()["items"][0]
+    assert (
+        client.post(f"/memory/notes/{austin['id']}/correct", json={"content": "x"}).status_code
+        == 409
+    )
+    turn = client.get("/memory/notes", params={"tier": "episode"}).json()["items"][0]
+    assert (
+        client.post(f"/memory/notes/{turn['id']}/correct", json={"content": "x"}).status_code == 409
+    )
+    assert (
+        client.post(f"/memory/notes/{dallas['id']}/correct", json={"content": ""}).status_code
+        == 422
+    )
+
+
+def test_forgetting_a_fact_forgets_its_turns_and_chat_stops_using_them(make_client, fresh_db):
+    client, _, _ = _two_nights(make_client)
+    dallas = client.get("/memory/notes", params={"q": "dallas"}).json()["items"][0]
+
+    r = client.post(f"/memory/notes/{dallas['id']}/forget").json()
+    assert r["turns_forgotten"] == 1 and r["themes"] == []
+    assert client.get("/memory/notes", params={"q": "dallas"}).json()["total"] == 0
+    forgotten = client.get(
+        "/memory/notes", params={"tier": "fact,episode", "status": "forgotten", "q": "dallas"}
+    ).json()
+    assert forgotten["total"] == 2  # the fact and the turn it came from
+    assert client.post(f"/memory/notes/{dallas['id']}/forget").status_code == 409
+
+    answer = chat(client, "Where do I live? Dallas?", MAR.replace(day=20))
+    used = {m["id"] for m in answer["retrieved"]}
+    assert dallas["id"] not in used
+    assert not any("Dallas" in m["preview"] for m in answer["retrieved"])
+
+
+def test_a_turn_forgotten_before_sleep_is_never_learned(make_client, fresh_db):
+    client = make_client(sleep_llm=FakeLLM(sleep_brain), enable_auditor=False)
+    chat(client, "I live in Austin", JAN)
+    turn = client.get("/memory/notes", params={"tier": "episode"}).json()["items"][0]
+    assert client.get("/memory/stats").json()["pending_episodes"] == 1
+
+    client.post(f"/memory/notes/{turn['id']}/forget")
+
+    assert client.get("/memory/stats").json()["pending_episodes"] == 0
+    assert sleep(client, JAN_SLEEP)["status"] == "nothing_to_do"
+    assert client.get("/memory/notes").json()["total"] == 0

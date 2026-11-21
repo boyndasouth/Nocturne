@@ -3,11 +3,13 @@ import type { Connection } from "../api";
 
 export function Settings(props: {
   value: Connection;
-  onSave: (c: Connection) => void;
+  dev: boolean;
+  onSave: (c: Connection, dev: boolean) => void;
   onClose: () => void;
 }) {
   const [url, setUrl] = useState(props.value.url);
   const [apiKey, setApiKey] = useState(props.value.apiKey);
+  const [dev, setDev] = useState(props.dev);
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -21,10 +23,10 @@ export function Settings(props: {
         method="dialog"
         onSubmit={(e) => {
           e.preventDefault();
-          props.onSave({ url: url.trim(), apiKey: apiKey.trim() });
+          props.onSave({ url: url.trim(), apiKey: apiKey.trim() }, dev);
         }}
       >
-        <h2>Connection</h2>
+        <h2>Settings</h2>
         <label>
           Backend URL
           <input
@@ -45,13 +47,22 @@ export function Settings(props: {
             placeholder="Leave empty if the backend has no API_KEY"
           />
         </label>
+        <label className="check">
+          <input type="checkbox" checked={dev} onChange={(e) => setDev(e.target.checked)} />
+          <span>
+            Show developer details
+            <span className="fine">
+              Memories as stored for the model, ids, scores, model calls and tokens.
+            </span>
+          </span>
+        </label>
         <p className="fine">Saved in this browser only.</p>
         <div className="dialog-actions">
           <button type="button" className="ghost" onClick={props.onClose}>
             Cancel
           </button>
           <button type="submit" className="primary">
-            Save connection
+            Save settings
           </button>
         </div>
       </form>

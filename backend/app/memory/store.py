@@ -488,12 +488,14 @@ class MemoryStore:
     # --- Sleep-cycle inputs -------------------------------------------------------------------
 
     async def pending_episodes(self, *, before: datetime, limit: int) -> list[MemoryNote]:
-        """Episodes no cycle has consolidated yet, oldest first."""
+        """Episodes no cycle has consolidated yet, oldest first. A turn the person forgot
+        before it was consolidated is skipped, so sleep doesn't learn it anyway."""
         async with self._pool.connection() as conn:
             cur = await conn.execute(
                 f"""
                 select {NOTE_COLUMNS} from memory_notes
-                where tier = 'episode' and consolidated_in is null and recorded_at <= %s
+                where tier = 'episode' and consolidated_in is null and status = 'active'
+                  and recorded_at <= %s
                 order by recorded_at, valid_from, id
                 limit %s
                 """,
@@ -506,7 +508,7 @@ class MemoryStore:
         async with self._pool.connection() as conn:
             cur = await conn.execute(
                 "select count(*) as n from memory_notes"
-                " where tier = 'episode' and consolidated_in is null"
+                " where tier = 'episode' and consolidated_in is null and status = 'active'"
             )
             row = await cur.fetchone()
         return int(row["n"]) if row else 0

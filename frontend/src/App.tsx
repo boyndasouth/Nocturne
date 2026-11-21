@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { client, loadConnection, saveConnection, type Connection } from "./api";
-import { Ctx, plural, useHashRoute, useLoad } from "./lib";
+import { Ctx, plural, store, stored, useHashRoute, useLoad } from "./lib";
 import { Settings } from "./components/Settings";
 import { Chat } from "./views/Chat";
 import { MemoryView } from "./views/Memory";
@@ -8,7 +8,7 @@ import { Nights } from "./views/Nights";
 
 const NAV = [
   { route: "chat", label: "Chat", hint: "Ask about anything you've told it" },
-  { route: "memory", label: "Memory", hint: "Every fact, theme and how they connect" },
+  { route: "memory", label: "Memory", hint: "What it knows about you, and how it connects" },
   { route: "nights", label: "Nights", hint: "What each sleep cycle changed" },
 ] as const;
 
@@ -16,6 +16,7 @@ export default function App() {
   const [conn, setConn] = useState<Connection>(loadConnection);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [dev, setDev] = useState(() => stored("nocturne.dev") === "1");
   const [parts, go] = useHashRoute();
   const api = useMemo(() => client(conn), [conn]);
   const section = parts[0] ?? "chat";
@@ -23,8 +24,8 @@ export default function App() {
   const openNote = useCallback((id: string) => go(`memory/${id}`), [go]);
   const bump = useCallback(() => setRefreshKey((k) => k + 1), []);
   const ctx = useMemo(
-    () => ({ api, conn, go, openNote, refreshKey, bump }),
-    [api, conn, go, openNote, refreshKey, bump],
+    () => ({ api, conn, go, openNote, refreshKey, bump, dev }),
+    [api, conn, go, openNote, refreshKey, bump, dev],
   );
 
   const stats = useLoad(() => api.stats(), [api, refreshKey]);
@@ -82,7 +83,7 @@ export default function App() {
               <p className="rail-error">Not connected</p>
             ) : null}
             <button className="link-button" onClick={() => setSettingsOpen(true)}>
-              Connection settings
+              Settings
             </button>
           </div>
         </aside>
@@ -100,10 +101,13 @@ export default function App() {
       {settingsOpen && (
         <Settings
           value={conn}
+          dev={dev}
           onClose={() => setSettingsOpen(false)}
-          onSave={(c) => {
+          onSave={(c, d) => {
             saveConnection(c);
             setConn(c);
+            setDev(d);
+            store("nocturne.dev", d ? "1" : "0");
             setSettingsOpen(false);
           }}
         />

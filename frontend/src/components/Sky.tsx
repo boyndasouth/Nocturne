@@ -31,6 +31,8 @@ export function Sky(props: {
   selected: string | null;
   query: string;
   onSelect: (id: string) => void;
+  /** How note text is shown (addressed to the reader, or as stored). */
+  label: (s: string) => string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const fg = useRef<ForceGraphMethods<N, L> | undefined>(undefined);
@@ -100,7 +102,7 @@ export function Sky(props: {
         warmupTicks={reduced ? 160 : 40}
         onEngineStop={() => fg.current?.zoomToFit(400, 60)}
         nodeId="id"
-        nodeLabel={(n) => n.content}
+        nodeLabel={(n) => props.label(n.content)}
         nodeRelSize={1}
         nodeVal={(n) => radius(n) ** 2}
         onNodeClick={(n) => props.onSelect(n.id)}
@@ -122,10 +124,10 @@ export function Sky(props: {
           const x = n.x ?? 0;
           const y = n.y ?? 0;
           const faded = (q && !matches(n)) || (near && n.id !== focus && !near.has(n.id));
-          const color =
-            n.status === "superseded" ? C.outdated : n.status === "archived" ? C.dim : C[n.tier];
+          const gone = n.status === "archived" || n.status === "forgotten";
+          const color = n.status === "superseded" ? C.outdated : gone ? C.dim : C[n.tier];
           ctx.save();
-          ctx.globalAlpha = faded ? 0.18 : n.status === "archived" ? 0.5 : 1;
+          ctx.globalAlpha = faded ? 0.18 : gone ? 0.5 : 1;
           if (n.tier === "theme") {
             ctx.beginPath();
             ctx.arc(x, y, r + 3.5, 0, 2 * Math.PI);
@@ -165,7 +167,8 @@ export function Sky(props: {
             ctx.fillStyle = n.status === "superseded" ? C.outdated : "rgba(241,239,248,0.92)";
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
-            const text = n.tier === "theme" ? clip(n.content.split(":")[0], 28) : clip(n.content, 44);
+            const shown = props.label(n.content);
+            const text = n.tier === "theme" ? clip(shown.split(":")[0], 28) : clip(shown, 44);
             ctx.fillText(text, x, y + r + 3);
           }
           ctx.restore();

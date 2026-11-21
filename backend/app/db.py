@@ -67,6 +67,17 @@ async def verify_schema(database_url: str, expected_dim: int) -> None:
                 "The database is missing the Phase 2 sleep-cycle schema. "
                 "Run `python -m scripts.migrate`."
             )
+        forgotten = await (
+            await conn.execute(
+                "select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid"
+                " where t.typname = 'note_status' and e.enumlabel = 'forgotten'"
+            )
+        ).fetchone()
+        if forgotten is None:
+            raise SchemaError(
+                "The database is missing migration 005 (forgetting from the UI). "
+                "Run `python -m scripts.migrate`."
+            )
         if row["dim"] != expected_dim:
             raise SchemaError(
                 f"memory_notes.embedding is vector({row['dim']}) but EMBEDDING_DIM={expected_dim}."

@@ -61,7 +61,7 @@ class MemoryExplorer:
                 "select (select count(*) from memory_links) as links,"
                 " (select count(*) from sleep_cycles) as cycles,"
                 " (select count(*) from memory_notes where tier = 'episode'"
-                "   and consolidated_in is null) as pending_episodes"
+                "   and consolidated_in is null and status = 'active') as pending_episodes"
             )
             row = await cur.fetchone()
         assert row is not None

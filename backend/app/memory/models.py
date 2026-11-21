@@ -18,7 +18,8 @@ class Tier(StrEnum):
 class Status(StrEnum):
     ACTIVE = "active"
     SUPERSEDED = "superseded"
-    ARCHIVED = "archived"
+    ARCHIVED = "archived"  # the Forgetter's soft forgetting; retrieval can fall back to it
+    FORGOTTEN = "forgotten"  # the person asked to forget it; never retrieved again
 
 
 class LinkType(StrEnum):

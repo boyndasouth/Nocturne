@@ -213,8 +213,12 @@ textarea::placeholder {
 .row-button .dot {
   transform: translateY(-1px);
 }
+.row-button[aria-current="true"] {
+  background: var(--night-3);
+}
 .row-button.superseded,
-.row-button.archived {
+.row-button.archived,
+.row-button.forgotten {
   color: var(--haze);
 }
 
@@ -489,14 +493,17 @@ nav {
   color: var(--episode);
 }
 .badge.superseded,
-.badge.archived {
+.badge.archived,
+.badge.forgotten {
   color: var(--haze);
 }
 .note-text {
   font: 400 var(--t-l) / 1.4 var(--serif);
   margin-bottom: 1rem;
 }
-.note-text.superseded {
+.note-text.superseded,
+.note-text.archived,
+.note-text.forgotten {
   color: var(--mist);
 }
 .facts-about {
@@ -548,7 +555,8 @@ nav {
   background: var(--night-2);
   border: 1.5px solid var(--haze);
 }
-.history li.archived::before {
+.history li.archived::before,
+.history li.forgotten::before {
   background: var(--line);
 }
 .history-head {
@@ -731,7 +739,8 @@ nav {
   font: 400 var(--t-m) / 1.45 var(--serif);
 }
 .list-row.superseded .list-text,
-.list-row.archived .list-text {
+.list-row.archived .list-text,
+.list-row.forgotten .list-text {
   color: var(--haze);
 }
 .list-meta {
@@ -917,6 +926,157 @@ details.read .quotes {
   margin-top: 1rem;
 }
 
+/* --- changes the person makes ------------------------------------------------------------ */
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.note-panel > .action-row {
+  margin-bottom: 1.5rem;
+}
+.note-panel .action-row .ghost {
+  padding: 0.35rem 0.8rem;
+  font-size: var(--t-xs);
+}
+.action-box {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: var(--r);
+  background: var(--night-3);
+}
+.action-box label {
+  font-size: var(--t-xs);
+  font-weight: 600;
+}
+.action-box textarea {
+  width: 100%;
+  resize: vertical;
+  font: 400 var(--t-m) / 1.45 var(--serif);
+}
+.action-box.warn {
+  box-shadow: inset 3px 0 0 var(--doubt);
+}
+.action-box.done {
+  box-shadow: inset 3px 0 0 var(--episode);
+}
+.action-box ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.danger {
+  border-radius: var(--r);
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  background: var(--wrong);
+  border: 1px solid var(--wrong);
+  color: var(--night);
+}
+.quotes li.forgotten blockquote {
+  color: var(--haze);
+  border-left-color: var(--line);
+}
+.dev-facts {
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px dashed var(--line);
+  display: grid;
+  gap: 0.3rem;
+  font-size: var(--t-xs);
+}
+.dev-facts div {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.5rem;
+}
+.dev-facts dt {
+  color: var(--haze);
+}
+.dev-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* --- about you -------------------------------------------------------------------------- */
+.about {
+  overflow-y: auto;
+  padding: 2.5rem clamp(1rem, 5vw, 4rem) 4rem;
+}
+.about > * {
+  max-width: 46rem;
+}
+.about-head {
+  margin-bottom: 2.25rem;
+}
+.about-head h1 {
+  text-wrap: balance;
+  font: 400 var(--t-xxl) / 1.15 var(--serif);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.75rem;
+}
+.about-head p {
+  font-size: var(--t-m);
+  max-width: 38rem;
+}
+.about-group {
+  border-top: 1px solid var(--line);
+  padding: 1.5rem 0 1.25rem;
+}
+.about-group h2 {
+  font: italic 500 var(--t-l) / 1.3 var(--serif);
+  color: var(--theme);
+  margin-bottom: 0.35rem;
+}
+.heading-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.heading-button:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+.about-summary {
+  color: var(--mist);
+  font-family: var(--serif);
+  margin-bottom: 0.9rem;
+  max-width: 40rem;
+}
+.about-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+.since {
+  max-width: 44rem;
+  width: 100%;
+  margin-bottom: 1.5rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--r);
+  background: var(--night-2);
+  box-shadow: inset 3px 0 0 var(--theme);
+  display: grid;
+  gap: 0.6rem;
+}
+.since p {
+  font-family: var(--serif);
+  font-size: var(--t-m);
+}
+.since .ghost {
+  padding: 0.35rem 0.8rem;
+  font-size: var(--t-xs);
+}
+
 /* --- dialog ----------------------------------------------------------------------------- */
 .dialog {
   border: 1px solid var(--line);
@@ -939,6 +1099,21 @@ details.read .quotes {
   margin-bottom: 1rem;
   font-size: var(--t-xs);
   color: var(--mist);
+}
+.dialog label.check {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  color: var(--moon);
+  font-size: var(--t-s);
+  cursor: pointer;
+}
+.dialog label.check input {
+  margin-top: 0.3rem;
+  accent-color: var(--fact);
+}
+.dialog label.check .fine {
+  display: block;
 }
 .dialog input {
   color: var(--moon);

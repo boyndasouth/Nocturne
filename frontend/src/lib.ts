@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { Client, Connection, LinkType, Note } from "./api";
+import { toYou } from "./voice";
 
 // --- app context ---------------------------------------------------------------------------
 
@@ -10,6 +11,8 @@ export interface AppCtx {
   openNote: (id: string) => void;
   refreshKey: number;
   bump: () => void;
+  /** Developer details: stored wording, ids, scores and costs. */
+  dev: boolean;
 }
 
 export const Ctx = createContext<AppCtx | null>(null);
@@ -18,6 +21,12 @@ export function useApp(): AppCtx {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useApp outside provider");
   return ctx;
+}
+
+/** How a stored memory is shown: as stored for developers, addressed to the reader otherwise. */
+export function useText(): (s: string) => string {
+  const { dev } = useApp();
+  return dev ? (s) => s : toYou;
 }
 
 // --- routing (hash based: works on any static host) ----------------------------------------
@@ -109,8 +118,25 @@ export const tierName: Record<Note["tier"], string> = {
 export const statusName: Record<Note["status"], string> = {
   active: "Current",
   superseded: "Outdated",
-  archived: "Forgotten",
+  archived: "Faded",
+  forgotten: "Forgotten",
 };
+
+/** Storage that may be unavailable (private windows, blocked site data). */
+export function stored(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+export function store(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // kept for this visit only
+  }
+}
 
 /** How a link reads from this note's side. */
 export function linkPhrase(type: LinkType, dir: "out" | "in"): string {

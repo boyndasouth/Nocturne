@@ -1,18 +1,20 @@
-import { useEffect, useState } from "react";
-import { explain } from "../api";
-import { day, plural, statusName, tierName, useApp, useLoad } from "../lib";
+import { useEffect, useMemo, useState } from "react";
+import { explain, type Graph, type Note } from "../api";
+import { day, plural, statusName, store, stored, tierName, useApp, useLoad, useText } from "../lib";
 import { NotePanel } from "../components/NotePanel";
 import { Sky } from "../components/Sky";
 
-type Mode = "sky" | "list";
+type Mode = "about" | "sky" | "list";
 const PAGE = 50;
+const MODES: { id: Mode; label: string }[] = [
+  { id: "about", label: "About you" },
+  { id: "sky", label: "Map" },
+  { id: "list", label: "List" },
+];
 
 function readMode(): Mode {
-  try {
-    return localStorage.getItem("nocturne.memoryMode") === "list" ? "list" : "sky";
-  } catch {
-    return "sky";
-  }
+  const m = stored("nocturne.memoryMode");
+  return m === "sky" || m === "list" ? m : "about";
 }
 
 export function MemoryView({ selected }: { selected: string | null }) {
@@ -20,24 +22,32 @@ export function MemoryView({ selected }: { selected: string | null }) {
   const [mode, setMode] = useState<Mode>(readMode);
   const [query, setQuery] = useState("");
   const [outdated, setOutdated] = useState(true);
+  const [faded, setFaded] = useState(false);
   const [forgotten, setForgotten] = useState(false);
   const [turns, setTurns] = useState(false);
   const [offset, setOffset] = useState(0);
+  const text = useText();
 
   const tier = turns ? "fact,theme,episode" : "fact,theme";
-  const status = ["active", outdated && "superseded", forgotten && "archived"].filter(Boolean).join(",");
+  const status = [
+    "active",
+    outdated && "superseded",
+    faded && "archived",
+    forgotten && "forgotten",
+  ]
+    .filter(Boolean)
+    .join(",");
 
-  useEffect(() => {
-    try {
-      localStorage.setItem("nocturne.memoryMode", mode);
-    } catch {
-      // per-visit only
-    }
-  }, [mode]);
+  useEffect(() => store("nocturne.memoryMode", mode), [mode]);
   useEffect(() => setOffset(0), [query, tier, status]);
 
   const graph = useLoad(
-    () => (mode === "sky" ? api.graph({ tier, status, limit: 600 }) : Promise.resolve(null)),
+    () =>
+      mode === "sky"
+        ? api.graph({ tier, status, limit: 600 })
+        : mode === "about"
+          ? api.graph({ tier: "fact,theme", status: "active", limit: 2000 })
+          : Promise.resolve(null),
     [api, mode, tier, status, refreshKey],
   );
   const list = useLoad(
@@ -55,12 +65,16 @@ export function MemoryView({ selected }: { selected: string | null }) {
       <div className="memory-main">
         <header className="toolbar">
           <div className="segmented" role="tablist" aria-label="View">
-            <button role="tab" aria-selected={mode === "sky"} onClick={() => setMode("sky")}>
-              Map
-            </button>
-            <button role="tab" aria-selected={mode === "list"} onClick={() => setMode("list")}>
-              List
-            </button>
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                role="tab"
+                aria-selected={mode === m.id}
+                onClick={() => setMode(m.id)}
+              >
+                {m.label}
+              </button>
+            ))}
           </div>
           <input
             type="search"
@@ -70,34 +84,40 @@ export function MemoryView({ selected }: { selected: string | null }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <fieldset className="filters">
-            <legend className="sr-only">Include</legend>
-            <label>
-              <input type="checkbox" checked={outdated} onChange={(e) => setOutdated(e.target.checked)} />
-              Outdated
-            </label>
-            <label>
-              <input type="checkbox" checked={forgotten} onChange={(e) => setForgotten(e.target.checked)} />
-              Forgotten
-            </label>
-            <label>
-              <input type="checkbox" checked={turns} onChange={(e) => setTurns(e.target.checked)} />
-              Conversation turns
-            </label>
-          </fieldset>
+          {mode !== "about" && (
+            <fieldset className="filters">
+              <legend className="sr-only">Include</legend>
+              <Check label="Outdated" on={outdated} set={setOutdated} />
+              <Check label="Faded" on={faded} set={setFaded} />
+              <Check label="Forgotten" on={forgotten} set={setForgotten} />
+              <Check label="Conversation turns" on={turns} set={setTurns} />
+            </fieldset>
+          )}
         </header>
 
         {error ? (
           <p className="error stage-msg" role="alert">
             {explain(error, conn)}
           </p>
+        ) : mode === "about" ? (
+          graph.data ? (
+            <AboutYou graph={graph.data} query={query} selected={selected} onSelect={select} />
+          ) : (
+            <p className="muted stage-msg">Loading what it knows</p>
+          )
         ) : mode === "sky" ? (
           graph.data ? (
             graph.data.nodes.length === 0 ? (
               <EmptyMemory />
             ) : (
               <>
-                <Sky graph={graph.data} selected={selected} query={query} onSelect={select} />
+                <Sky
+                  graph={graph.data}
+                  selected={selected}
+                  query={query}
+                  onSelect={select}
+                  label={text}
+                />
                 {graph.data.total > graph.data.nodes.length && (
                   <p className="fine sky-note">
                     Showing the newest {graph.data.nodes.length.toLocaleString()} of{" "}
@@ -127,8 +147,11 @@ export function MemoryView({ selected }: { selected: string | null }) {
                       aria-current={selected === n.id ? "true" : undefined}
                       onClick={() => select(n.id)}
                     >
-                      <span className={`dot ${n.status === "superseded" ? "outdated" : n.tier}`} aria-hidden="true" />
-                      <span className="list-text">{n.content}</span>
+                      <span
+                        className={`dot ${n.status === "superseded" ? "outdated" : n.tier}`}
+                        aria-hidden="true"
+                      />
+                      <span className="list-text">{text(n.content)}</span>
                       <span className="list-meta">
                         {tierName[n.tier]}
                         {n.status !== "active" && `, ${statusName[n.status].toLowerCase()}`}
@@ -141,7 +164,11 @@ export function MemoryView({ selected }: { selected: string | null }) {
               </ul>
               {list.data.total > PAGE && (
                 <nav className="pager" aria-label="Pages">
-                  <button className="ghost" disabled={offset === 0} onClick={() => setOffset(offset - PAGE)}>
+                  <button
+                    className="ghost"
+                    disabled={offset === 0}
+                    onClick={() => setOffset(offset - PAGE)}
+                  >
                     Newer
                   </button>
                   <span className="muted">
@@ -171,13 +198,111 @@ export function MemoryView({ selected }: { selected: string | null }) {
   );
 }
 
+function Check(props: { label: string; on: boolean; set: (v: boolean) => void }) {
+  return (
+    <label>
+      <input type="checkbox" checked={props.on} onChange={(e) => props.set(e.target.checked)} />
+      {props.label}
+    </label>
+  );
+}
+
+/** Current facts grouped under the themes that summarize them; the rest at the end. */
+function AboutYou(props: {
+  graph: Graph;
+  query: string;
+  selected: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const text = useText();
+  const { groups, rest, facts } = useMemo(() => {
+    const byId = new Map(props.graph.nodes.map((n) => [n.id, n]));
+    const themed = new Set<string>();
+    const groups: { theme: Note; facts: Note[] }[] = [];
+    for (const theme of props.graph.nodes.filter((n) => n.tier === "theme")) {
+      const members = props.graph.edges
+        .filter((e) => e.link_type === "summarizes" && e.src_id === theme.id)
+        .map((e) => byId.get(e.dst_id))
+        .filter((n): n is Note => !!n && n.tier === "fact");
+      members.sort((a, b) => a.valid_from.localeCompare(b.valid_from));
+      members.forEach((m) => themed.add(m.id));
+      groups.push({ theme, facts: members });
+    }
+    groups.sort((a, b) => b.facts.length - a.facts.length);
+    const rest = props.graph.nodes
+      .filter((n) => n.tier === "fact" && !themed.has(n.id))
+      .sort((a, b) => b.valid_from.localeCompare(a.valid_from));
+    const facts = props.graph.nodes.filter((n) => n.tier === "fact").length;
+    return { groups, rest, facts };
+  }, [props.graph]);
+
+  const q = props.query.trim().toLowerCase();
+  const hit = (n: Note) => !q || n.content.toLowerCase().includes(q);
+  const shown = groups
+    .map((g) => ({ ...g, facts: hit(g.theme) && q ? g.facts : g.facts.filter(hit) }))
+    .filter((g) => g.facts.length > 0 || (q && hit(g.theme)) || !q);
+  const restShown = rest.filter(hit);
+
+  if (facts === 0) return <EmptyMemory />;
+
+  const row = (n: Note) => (
+    <li key={n.id}>
+      <button
+        className="row-button"
+        aria-current={props.selected === n.id ? "true" : undefined}
+        onClick={() => props.onSelect(n.id)}
+      >
+        <span className="dot fact" aria-hidden="true" />
+        {text(n.content)}
+      </button>
+    </li>
+  );
+
+  return (
+    <div className="about">
+      <header className="about-head">
+        <h1>What it knows about you</h1>
+        <p className="muted">
+          {plural(facts, "thing")} it currently believes, gathered from your conversations while it
+          slept. Open one to see where it came from, correct it, or make it forget.
+        </p>
+      </header>
+      {shown.map(({ theme, facts }) => {
+        const [title, ...summary] = text(theme.content).split(": ");
+        return (
+          <section key={theme.id} className="about-group">
+            <h2>
+              <button className="heading-button" onClick={() => props.onSelect(theme.id)}>
+                {summary.length ? title : "Theme"}
+              </button>
+            </h2>
+            <p className="about-summary">{summary.length ? capital(summary.join(": ")) : title}</p>
+            {facts.length > 0 && <ul>{facts.map(row)}</ul>}
+          </section>
+        );
+      })}
+      {restShown.length > 0 && (
+        <section className="about-group">
+          <h2>{groups.length ? "Everything else" : "Things you've mentioned"}</h2>
+          <ul>{restShown.map(row)}</ul>
+        </section>
+      )}
+      {q && shown.every((g) => g.facts.length === 0) && restShown.length === 0 && (
+        <p className="muted">Nothing current matches “{props.query}”. Try the List view to include outdated ones.</p>
+      )}
+    </div>
+  );
+}
+
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 function EmptyMemory() {
   return (
     <div className="stage-msg">
-      <h2>No facts yet</h2>
+      <h2>Nothing learned yet</h2>
       <p className="muted">
-        Facts appear after a sleep cycle reads your conversations. Chat for a while, then run one from{" "}
-        <a href="#/nights">Nights</a>.
+        Memories appear after a sleep cycle reads your conversations. Chat for a while, then start
+        one from <a href="#/nights">Nights</a>.
       </p>
     </div>
   );

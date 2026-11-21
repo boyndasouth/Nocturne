@@ -1,14 +1,26 @@
 # Nocturne frontend
 
-React + TypeScript + Vite. Three views over the backend API:
+React + TypeScript + Vite. It serves two kinds of reader: the person the memory is about,
+who sees it addressed to them ("You live in Dallas.") and can correct or forget any of it,
+and developers, who turn on **Settings → Show developer details** to see memories as stored
+for the model, ids, scores, model calls and tokens.
 
-- **Chat**: talk to the agent; numbered citations open the memory they came from.
-- **Memory**: every fact and theme as a map (force graph) or a list, with each note's
-  history (every version and the night that changed it), its connections, and what you said
-  that it came from.
+Three views over the backend API:
+
+- **Chat**: talk to the agent; numbered citations open the memory they came from. After a
+  sleep, a note says what changed overnight.
+- **Memory**: "About you" groups current facts under the themes that summarize them; Map
+  (force graph) and List show everything, including outdated, faded and forgotten memories.
+  Each note shows its history (every version and the night or person that changed it), its
+  connections, and what you said that it came from, with **Correct** and **Forget**.
 - **Nights**: one page per sleep cycle: what it learned, what stopped being true, what it
   heard again, themes it wrote, links it made, what it let go of, and the Auditor's verdicts.
   "Sleep now" starts a cycle.
+
+Forgetting stops the agent using a memory for good: the note and the conversation turns it
+came from (unless another fact relies on them) get the status `forgotten`, which no
+retrieval path reads. Faded memories (`archived` by the sleep agent) can still come back
+when nothing current answers. The rows stay so the history is traceable.
 
 ## Run locally
 
