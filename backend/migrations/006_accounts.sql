@@ -5,9 +5,9 @@
 -- hide every other owner's rows, from chat, the explorer and the sleep agent alike, and
 -- reject writes for anyone else. A connection with no owner set sees nothing.
 --
--- With AUTH_MODE=none (local dev, the eval harness, tests) connections stay the table
--- owner, which row-level security doesn't apply to, and new rows default to 'local'.
--- Queries behave exactly as before.
+-- With AUTH_MODE=none the same happens for the single account 'local'. Only the eval
+-- harness connects unscoped (as the table owner, which row-level security doesn't apply
+-- to); new rows then default to 'local' too.
 
 do $$
 begin

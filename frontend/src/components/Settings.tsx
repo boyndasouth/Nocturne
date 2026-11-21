@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Connection } from "../api";
+import { authEnabled } from "../auth";
 
 export function Settings(props: {
   value: Connection;
@@ -37,6 +38,7 @@ export function Settings(props: {
             placeholder="http://localhost:8000"
           />
         </label>
+{!authEnabled && (
         <label>
           API key
           <input
@@ -47,6 +49,7 @@ export function Settings(props: {
             placeholder="Leave empty if the backend has no API_KEY"
           />
         </label>
+        )}
         <label className="check">
           <input type="checkbox" checked={dev} onChange={(e) => setDev(e.target.checked)} />
           <span>

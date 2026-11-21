@@ -127,13 +127,14 @@ service_router = APIRouter(tags=["sleep"])
 
 
 class SleepAllResponse(BaseModel):
-    started: int = Field(description="Accounts whose sleep cycle was started")
+    waiting: int = Field(0, description="Accounts with conversation turns waiting for sleep")
+    started: int = Field(description="Accounts whose sleep cycle ran (wait=true)")
     busy: int = Field(description="Accounts already sleeping")
     failed: int = Field(description="Accounts whose cycle couldn't start (see the server log)")
 
 
 async def _sleep_owners(c: Container, owners: list[str]) -> SleepAllResponse:
-    out = SleepAllResponse(started=0, busy=0, failed=0)
+    out = SleepAllResponse(waiting=len(owners), started=0, busy=0, failed=0)
     for owner in owners:
         with owner_scope(owner):
             try:
@@ -161,8 +162,21 @@ async def _sleep_owners(c: Container, owners: list[str]) -> SleepAllResponse:
     response_model=SleepAllResponse,
     dependencies=[Depends(require_service)],
 )
-async def sleep_all(c: ContainerDep) -> SleepAllResponse:
+async def sleep_all(
+    c: ContainerDep,
+    response: Response,
+    wait: bool = Query(False, description="Run every cycle before responding (tests)."),
+) -> SleepAllResponse:
     """Sleep every account that has conversation turns waiting, one after another. For the
-    scheduled job, with the service key (X-API-Key). Runs to completion."""
-    pending = await c.store.pending_by_owner()
-    return await _sleep_owners(c, sorted(pending))
+    scheduled job, with the service key (X-API-Key). By default it starts in the background
+    and answers 202 at once, so a host's request timeout can't cut it short."""
+    owners = sorted(await c.store.pending_by_owner())
+    if wait:
+        return await _sleep_owners(c, owners)
+    if owners:
+        task = asyncio.create_task(_sleep_owners(c, owners))
+        _background.add(task)
+        task.add_done_callback(_background.discard)
+        task.add_done_callback(lambda t: t.cancelled() or t.exception())
+        response.status_code = status.HTTP_202_ACCEPTED
+    return SleepAllResponse(waiting=len(owners), started=0, busy=0, failed=0)

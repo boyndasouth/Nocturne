@@ -32,6 +32,10 @@ class Settings(BaseSettings):
         None, description="Only for projects still on the legacy shared JWT secret (HS256)."
     )
     supabase_audience: str = "authenticated"
+    # Every connection acts for one account (row-level security), with accounts off too:
+    # then the account is 'local'. Only the eval harness turns this off; its disposable
+    # database holds a single memory and stays byte-for-byte comparable with older runs.
+    memory_isolation: bool = True
     cors_origins: str = Field(
         "http://localhost:5173,http://127.0.0.1:5173",
         description="Comma-separated browser origins allowed to call the API (the frontend's"

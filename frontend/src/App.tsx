@@ -1,4 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { authEnabled, supabase, type Session } from "./auth";
+import { SignIn } from "./components/SignIn";
 import { client, loadConnection, saveConnection, type Connection } from "./api";
 import { Ctx, plural, store, stored, useHashRoute, useLoad } from "./lib";
 import { Settings } from "./components/Settings";
@@ -12,13 +14,42 @@ const NAV = [
   { route: "nights", label: "Nights", hint: "What each sleep cycle changed" },
 ] as const;
 
+/** undefined while the stored session is being read, null when signed out. */
+function useSession(): Session | null | undefined {
+  const [session, setSession] = useState<Session | null | undefined>(authEnabled ? undefined : null);
+  useEffect(() => {
+    if (!supabase) return;
+    void supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => data.subscription.unsubscribe();
+  }, []);
+  return session;
+}
+
 export default function App() {
+  const session = useSession();
+  if (authEnabled && session === undefined) return null;
+  if (authEnabled && !session) return <SignIn />;
+  // A fresh workspace per account, so nothing on screen carries over between people.
+  return <Workspace key={session?.user.id ?? "local"} email={session?.user.email ?? null} />;
+}
+
+async function signOut() {
+  try {
+    sessionStorage.removeItem("nocturne.chat");
+  } catch {
+    // nothing stored
+  }
+  await supabase?.auth.signOut();
+}
+
+function Workspace({ email }: { email: string | null }) {
   const [conn, setConn] = useState<Connection>(loadConnection);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [dev, setDev] = useState(() => stored("nocturne.dev") === "1");
   const [parts, go] = useHashRoute();
-  const api = useMemo(() => client(conn), [conn]);
+  const api = useMemo(() => client(conn, () => void signOut()), [conn]);
   const section = parts[0] ?? "chat";
 
   const openNote = useCallback((id: string) => go(`memory/${id}`), [go]);
@@ -82,9 +113,21 @@ export default function App() {
             ) : stats.error ? (
               <p className="rail-error">Not connected</p>
             ) : null}
-            <button className="link-button" onClick={() => setSettingsOpen(true)}>
-              Settings
-            </button>
+            {email && (
+              <p className="account" title={email}>
+                {email}
+              </p>
+            )}
+            <div className="rail-links">
+              <button className="link-button" onClick={() => setSettingsOpen(true)}>
+                Settings
+              </button>
+              {authEnabled && (
+                <button className="link-button" onClick={() => void signOut()}>
+                  Sign out
+                </button>
+              )}
+            </div>
           </div>
         </aside>
 

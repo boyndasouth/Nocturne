@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { explain, type ChatResponse } from "../api";
+import { explain, type AnswerTrace, type ChatResponse } from "../api";
 import { day, episodeQuote, plural, store, stored, tierName, useApp, useLoad, useText } from "../lib";
 import { NotePanel } from "../components/NotePanel";
 
@@ -141,6 +141,7 @@ function Answer({
   active: string | null;
 }) {
   const text = useText();
+  const { dev } = useApp();
   const byRef = new Map(res.citations.map((c) => [c.ref, c.note_id]));
   const order = [...byRef.keys()];
   const parts: ReactNode[] = [];
@@ -168,7 +169,9 @@ function Answer({
   return (
     <>
       <p className="answer">{parts}</p>
-      {res.retrieved.length > 0 && (
+      {dev && res.trace ? (
+        <Trace trace={res.trace} onOpen={onCite} />
+      ) : res.retrieved.length > 0 && (
         <details className="used">
           <summary>Looked at {res.retrieved.length} memories</summary>
           <ul>
@@ -224,5 +227,81 @@ function SinceLastTime() {
         </button>
       </div>
     </aside>
+  );
+}
+
+const VIA: Record<string, string> = {
+  search: "Matched the question",
+  theme: "Member of a matching theme",
+  link: "Linked to a matching fact",
+  fallback: "Faded memory, used as a fallback",
+};
+
+/** Developer view: why the assistant answered as it did. */
+function Trace({ trace, onOpen }: { trace: AnswerTrace; onOpen: (id: string) => void }) {
+  const top = Math.max(...trace.memories.map((m) => m.score), 0.0001);
+  const inPrompt = trace.memories.filter((m) => m.ref).length;
+  return (
+    <details className="trace">
+      <summary>
+        Answer trace: {plural(trace.memories.length, "memory", "memories")} retrieved, {inPrompt} in
+        the prompt, {trace.memories.filter((m) => m.cited).length} cited
+      </summary>
+      <p className="trace-meta">
+        {trace.model}, {trace.input_tokens.toLocaleString()} tokens in,{" "}
+        {trace.output_tokens.toLocaleString()} out, {Math.round(trace.latency_ms).toLocaleString()} ms.
+        The prompt also had {plural(trace.recent_turns, "recent turn")} and{" "}
+        {plural(trace.history_notes, "earlier version")} of current facts.
+      </p>
+      <table className="trace-table">
+        <thead>
+          <tr>
+            <th scope="col">Ref</th>
+            <th scope="col">Memory</th>
+            <th scope="col">Score</th>
+            <th scope="col" title="semantic / keyword / recency">Parts</th>
+          </tr>
+        </thead>
+        <tbody>
+          {trace.memories.map((m) => (
+            <tr key={m.id} className={m.ref ? "" : "dropped"}>
+              <td className="mono">
+                {m.ref ?? "—"}
+                {m.cited && <span className="cited" title="Cited in the answer"> ✓</span>}
+              </td>
+              <td>
+                <button className="row-button" onClick={() => onOpen(m.id)}>
+                  <span className={`dot ${m.status === "superseded" ? "outdated" : m.tier}`} aria-hidden="true" />
+                  <span>
+                    {m.tier === "episode" ? episodeQuote(m.content) : m.content}
+                    <span className="trace-via">
+                      {VIA[m.via] ?? m.via}
+                      {m.status !== "active" && `, ${m.status}`}
+                      {!m.ref && ", left out of the prompt"}
+                    </span>
+                  </span>
+                </button>
+              </td>
+              <td>
+                <span className="bar" style={{ width: `${(m.score / top) * 100}%` }} aria-hidden="true" />
+                {m.score.toFixed(3)}
+              </td>
+              <td className="mono small">
+                {m.semantic.toFixed(2)} / {m.keyword.toFixed(2)} / {m.recency.toFixed(2)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {trace.messages.map((msg, i) => (
+        <details key={i} className="prompt">
+          <summary>
+            {msg.role === "system" ? "System prompt" : "Message sent with memories"} (
+            {msg.content.length.toLocaleString()} characters)
+          </summary>
+          <pre>{msg.content}</pre>
+        </details>
+      ))}
+    </details>
   );
 }

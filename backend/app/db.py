@@ -8,7 +8,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from app.config import Settings
-from app.owner import ScopedPool
+from app.owner import LOCAL_OWNER, ScopedPool
 
 
 class SchemaError(RuntimeError):
@@ -36,14 +36,16 @@ def create_pool(settings: Settings) -> ScopedPool:
     # prepare_threshold=None: server-side prepared statements break behind PgBouncer-style
     # transaction poolers (Supabase port 6543, Neon "-pooler" hosts). Disabling them costs
     # little at this scale and makes any connection string safe.
-    scoped = settings.auth_mode == "supabase"
+    accounts = settings.auth_mode == "supabase"
+    scoped = settings.memory_isolation or accounts
     return ScopedPool(
         scoped=scoped,
+        default_owner=None if accounts else LOCAL_OWNER,
         conninfo=settings.database_url,
         min_size=settings.db_pool_min,
         max_size=settings.db_pool_max,
         open=False,
-        configure=_configure_scoped if scoped else _configure,
+        configure=_configure_scoped if accounts else _configure,
         check=AsyncConnectionPool.check_connection,  # free tiers drop idle connections
         kwargs={"prepare_threshold": None, "row_factory": dict_row},
         name="nocturne",

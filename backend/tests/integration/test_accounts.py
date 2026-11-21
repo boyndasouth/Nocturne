@@ -147,13 +147,14 @@ def test_service_key_sleeps_every_account(accounts):
     assert accounts.post("/sleep/all", headers=auth(ALICE)).status_code == 403
     assert accounts.post("/sleep/all").status_code == 401
 
-    r = accounts.post("/sleep/all", headers={"X-API-Key": "service-key"})
+    r = accounts.post("/sleep/all", params={"wait": "true"}, headers={"X-API-Key": "service-key"})
     assert r.status_code == 200, r.text
-    assert r.json() == {"started": 2, "busy": 0, "failed": 0}
+    assert r.json() == {"waiting": 2, "started": 2, "busy": 0, "failed": 0}
     assert facts(accounts, ALICE) == ["The user lives in Austin."]
     assert facts(accounts, BOB) == ["The user's linear algebra exam is on Friday."]
-    again = accounts.post("/sleep/all", headers={"X-API-Key": "service-key"}).json()
-    assert again == {"started": 0, "busy": 0, "failed": 0}
+    again = accounts.post("/sleep/all", headers={"X-API-Key": "service-key"})
+    assert again.status_code == 200  # nothing waiting: nothing started
+    assert again.json() == {"waiting": 0, "started": 0, "busy": 0, "failed": 0}
 
 
 async def test_idle_trigger_sleeps_each_account_separately(accounts):
@@ -196,8 +197,21 @@ def test_accounts_off_is_one_local_memory(make_client):
     r = client.post("/chat", json={"message": "I live in Austin", "occurred_at": JAN.isoformat()})
     assert r.status_code == 200
     assert client.get("/me").json() == {"auth_mode": "none", "owner": "local", "email": None}
-    r = client.post("/sleep/all")  # the local caller is the only account
+    r = client.post("/sleep/all", params={"wait": "true"})  # local is the only account
     assert r.status_code == 200 and r.json()["started"] == 1
     assert [n["content"] for n in client.get("/memory/notes").json()["items"]] == [
         "The user lives in Austin."
     ]
+
+
+def test_accounts_off_never_shows_other_accounts(make_client, fresh_db):
+    """A database that once had accounts on: with accounts off you see only 'local'."""
+    with psycopg.connect(fresh_db, autocommit=True) as conn:
+        conn.execute("select set_config('nocturne.owner', %s, false)", (ALICE,))
+        conn.execute(
+            "insert into memory_notes (tier, content, valid_from) values ('fact', %s, now())",
+            ("The user lives in Austin.",),
+        )
+    client = make_client(enable_auditor=False)
+    assert client.get("/memory/notes").json()["total"] == 0
+    assert client.get("/memory/stats").json()["notes"]["fact"]["active"] == 0

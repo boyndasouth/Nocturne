@@ -38,11 +38,12 @@ jobs:
           done
           exit 1
 
-      - name: Trigger a sleep cycle
+      - name: Sleep every account with waiting conversations
         if: env.URL != ''
-        # 202 = started in the background, 200 = nothing to do, 409 = one is already running.
+        # /sleep/all with the service key (the backend's API_KEY), accounts on or off.
+        # 202 = started in the background, 200 = nothing waiting.
         run: |
           code=$(curl -sS -o body.json -w '%{http_code}' --max-time 60 -X POST \
-            -H "X-API-Key: $API_KEY" "$URL/sleep")
+            -H "X-API-Key: $API_KEY" "$URL/sleep/all")
           cat body.json; echo
-          case "$code" in 200|202|409) exit 0 ;; *) echo "HTTP $code"; exit 1 ;; esac
+          case "$code" in 200|202) exit 0 ;; *) echo "HTTP $code"; exit 1 ;; esac

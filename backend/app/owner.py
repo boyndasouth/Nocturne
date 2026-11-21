@@ -6,7 +6,8 @@ the pool is switched to the restricted role `nocturne_app` and tagged with that 
 Postgres row-level security (migration 006) does the rest: no query in the codebase needs
 an owner filter, and a connection with no owner sees nothing.
 
-With accounts off, connections stay unscoped and every row belongs to 'local'.
+With accounts off, the same happens for the single account 'local'. Only the eval harness
+uses unscoped connections (MEMORY_ISOLATION=false).
 """
 
 from __future__ import annotations
@@ -50,9 +51,18 @@ def set_owner(owner: str) -> None:
 class ScopedPool(AsyncConnectionPool):
     """A pool whose connections act for the current owner when `scoped` is true."""
 
-    def __init__(self, *args: object, scoped: bool = False, **kwargs: object) -> None:
+    def __init__(
+        self,
+        *args: object,
+        scoped: bool = False,
+        default_owner: str | None = None,
+        **kwargs: object,
+    ) -> None:
+        """`default_owner`: who a connection acts for outside any request (accounts off:
+        'local'). None means no default: such a connection is refused (accounts on)."""
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
         self.scoped = scoped
+        self.default_owner = default_owner
 
     @asynccontextmanager
     async def connection(  # type: ignore[override]
@@ -61,7 +71,7 @@ class ScopedPool(AsyncConnectionPool):
     ) -> AsyncIterator[psycopg.AsyncConnection]:
         async with super().connection(timeout) as conn:
             if self.scoped:
-                owner = _owner.get()
+                owner = _owner.get() or self.default_owner
                 if not owner:
                     raise OwnerMissing("no owner in context for a scoped connection")
                 await conn.execute(

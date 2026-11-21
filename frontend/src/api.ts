@@ -1,4 +1,5 @@
 // Typed client for the Nocturne backend. Shapes mirror backend/app/api/*.py.
+import { accessToken, authEnabled } from "./auth";
 
 export type Tier = "episode" | "fact" | "theme";
 export type Status = "active" | "superseded" | "archived" | "forgotten";
@@ -146,6 +147,7 @@ export interface ChatResponse {
   citations: { ref: string; note_id: string }[];
   retrieved: { id: string; tier: Tier; score: number; preview: string }[];
   episode_id: string;
+  trace?: AnswerTrace;
 }
 
 export interface ForgetResult {
@@ -158,6 +160,39 @@ export interface SleepResponse {
   status: "nothing_to_do" | "started" | "succeeded" | "failed";
   resumed: boolean;
   cycle: Cycle | null;
+}
+
+export interface MemoryTrace {
+  id: string;
+  tier: Tier;
+  status: Status;
+  content: string;
+  valid_from: string;
+  valid_to: string | null;
+  score: number;
+  semantic: number;
+  keyword: number;
+  recency: number;
+  via: "search" | "theme" | "link" | "fallback" | string;
+  ref: string | null;
+  cited: boolean;
+}
+
+export interface AnswerTrace {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  latency_ms: number;
+  memories: MemoryTrace[];
+  recent_turns: number;
+  history_notes: number;
+  messages: { role: string; content: string }[];
+}
+
+export interface Me {
+  auth_mode: "none" | "supabase";
+  owner: string;
+  email: string | null;
 }
 
 // --- connection settings ------------------------------------------------------------------
@@ -204,7 +239,11 @@ const sentence = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}.`;
 
 export function explain(err: unknown, conn: Connection): string {
   if (err instanceof ApiError) {
-    if (err.status === 401) return "The API key was refused. Enter the backend's API_KEY in Settings.";
+    if (err.status === 401)
+      return authEnabled
+        ? "Your session has ended. Sign in again."
+        : "The API key was refused. Enter the backend's API_KEY in Settings.";
+    if (err.status === 403) return "This account can't do that.";
     if (err.status === 404) return "Not found. It may belong to a different database.";
     if (err.status === 409) return sentence(err.message);
     if (err.status === 502 || err.status === 503)
@@ -214,12 +253,15 @@ export function explain(err: unknown, conn: Connection): string {
   return `Can't reach the backend at ${conn.url}. Check the URL in Settings, that the server is running, and that CORS_ORIGINS includes ${window.location.origin}.`;
 }
 
-export function client(conn: Connection) {
+export function client(conn: Connection, onUnauthorized?: () => void) {
   const base = conn.url.replace(/\/+$/, "");
 
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
-    if (conn.apiKey) headers["X-API-Key"] = conn.apiKey;
+    if (authEnabled) {
+      const token = await accessToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    } else if (conn.apiKey) headers["X-API-Key"] = conn.apiKey;
     if (init?.body) headers["Content-Type"] = "application/json";
     const res = await fetch(base + path, { ...init, headers });
     if (!res.ok) {
@@ -230,6 +272,7 @@ export function client(conn: Connection) {
       } catch {
         // not JSON
       }
+      if (res.status === 401 && authEnabled) onUnauthorized?.();
       throw new ApiError(res.status, detail);
     }
     return (await res.json()) as T;
@@ -243,6 +286,7 @@ export function client(conn: Connection) {
   };
 
   return {
+    me: () => request<Me>("/me"),
     stats: () => request<Stats>("/memory/stats"),
     notes: (p: { tier?: string; status?: string; q?: string; limit?: number; offset?: number }) =>
       request<NotePage>(`/memory/notes${qs(p)}`),
