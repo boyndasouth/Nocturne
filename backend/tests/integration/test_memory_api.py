@@ -189,3 +189,19 @@ def test_chat_returns_an_answer_trace(make_client, fresh_db):
     assert dallas["ref"] and f"[{dallas['ref']}]" in user["content"]  # it was in the prompt
     assert dallas["score"] > 0 and 0 <= dallas["semantic"] <= 1
     assert [m["id"] for m in t["memories"]] == [m["id"] for m in r["retrieved"]]
+
+
+def test_cors_allows_every_header_the_frontend_sends(make_client, fresh_db):
+    """Browsers ask first (preflight) before sending custom headers: the signed-in token,
+    the demo marker and the local API key must all be allowed."""
+    client = make_client(cors_origins="https://nocturne.example.app")
+    for headers in ("authorization", "x-nocturne-demo", "x-api-key", "content-type,authorization"):
+        r = client.options(
+            "/memory/notes",
+            headers={
+                "Origin": "https://nocturne.example.app",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": headers,
+            },
+        )
+        assert r.status_code == 200, (headers, r.text)

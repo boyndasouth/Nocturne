@@ -213,7 +213,8 @@ def create_app(
             CORSMiddleware,
             allow_origins=origins,
             allow_methods=["GET", "POST"],
-            allow_headers=["Content-Type", "X-API-Key", "Authorization"],
+            # Every header the frontend sends; a missing one fails the browser's preflight.
+            allow_headers=["Content-Type", "X-API-Key", "Authorization", "X-Nocturne-Demo"],
             max_age=600,
         )
     return app
