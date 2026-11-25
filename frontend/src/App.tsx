@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { authEnabled, supabase, type Session } from "./auth";
+import { authEnabled, demoActive, setDemo, supabase, type Session } from "./auth";
 import { SignIn } from "./components/SignIn";
 import { client, loadConnection, saveConnection, type Connection } from "./api";
 import { Ctx, plural, store, stored, useHashRoute, useLoad } from "./lib";
@@ -26,10 +26,21 @@ function useSession(): Session | null | undefined {
   return session;
 }
 
+function useDemo(): boolean {
+  const [demo, setDemoState] = useState(demoActive);
+  useEffect(() => {
+    const on = () => setDemoState(demoActive());
+    window.addEventListener("nocturne-demo", on);
+    return () => window.removeEventListener("nocturne-demo", on);
+  }, []);
+  return demo;
+}
+
 export default function App() {
   const session = useSession();
+  const demo = useDemo();
   if (authEnabled && session === undefined) return null;
-  if (authEnabled && !session) return <SignIn />;
+  if (authEnabled && !session) return demo ? <Workspace key="demo" email={null} demo /> : <SignIn />;
   // A fresh workspace per account, so nothing on screen carries over between people.
   return <Workspace key={session?.user.id ?? "local"} email={session?.user.email ?? null} />;
 }
@@ -43,7 +54,7 @@ async function signOut() {
   await supabase?.auth.signOut();
 }
 
-function Workspace({ email }: { email: string | null }) {
+function Workspace({ email, demo = false }: { email: string | null; demo?: boolean }) {
   const [conn, setConn] = useState<Connection>(loadConnection);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -54,9 +65,11 @@ function Workspace({ email }: { email: string | null }) {
 
   const openNote = useCallback((id: string) => go(`memory/${id}`), [go]);
   const bump = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const me = useLoad(() => api.me(), [api, refreshKey]);
+  const readOnly = demo || (me.data?.demo ?? false);
   const ctx = useMemo(
-    () => ({ api, conn, go, openNote, refreshKey, bump, dev }),
-    [api, conn, go, openNote, refreshKey, bump, dev],
+    () => ({ api, conn, go, openNote, refreshKey, bump, dev, me: me.data, readOnly }),
+    [api, conn, go, openNote, refreshKey, bump, dev, me.data, readOnly],
   );
 
   const stats = useLoad(() => api.stats(), [api, refreshKey]);
@@ -122,23 +135,41 @@ function Workspace({ email }: { email: string | null }) {
               <button className="link-button" onClick={() => setSettingsOpen(true)}>
                 Settings
               </button>
-              {authEnabled && (
+              {authEnabled && !demo && (
                 <button className="link-button" onClick={() => void signOut()}>
                   Sign out
+                </button>
+              )}
+              {demo && (
+                <button className="link-button" onClick={() => setDemo(false)}>
+                  Sign in
                 </button>
               )}
             </div>
           </div>
         </aside>
 
-        <main className="stage">
-          {section === "memory" ? (
-            <MemoryView selected={parts[1] ?? null} />
-          ) : section === "nights" ? (
-            <Nights selected={parts[1] ?? null} />
-          ) : (
-            <Chat />
+        <main className={`stage ${demo ? "has-banner" : ""}`}>
+          {demo && (
+            <div className="demo-banner" role="note">
+              <p>
+                You're exploring a demo memory: three months of a student's conversations, tidied up
+                over three nights. It's read-only.
+              </p>
+              <button className="primary" onClick={() => setDemo(false)}>
+                Sign in to build your own
+              </button>
+            </div>
           )}
+          <div className="stage-view">
+            {section === "memory" ? (
+              <MemoryView selected={parts[1] ?? null} />
+            ) : section === "nights" ? (
+              <Nights selected={parts[1] ?? null} />
+            ) : (
+              <Chat />
+            )}
+          </div>
         </main>
       </div>
       {settingsOpen && (

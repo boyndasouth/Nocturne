@@ -172,7 +172,7 @@ function Actions(props: {
   onChanged: () => void;
   onForgot: (r: ForgetResult) => void;
 }) {
-  const { api, conn, bump, dev } = useApp();
+  const { api, conn, bump, dev, readOnly } = useApp();
   const n = props.detail.note;
   const [mode, setMode] = useState<"idle" | "correct" | "forget">("idle");
   const [draft, setDraft] = useState("");
@@ -184,8 +184,8 @@ function Actions(props: {
     setErr(null);
   }, [n.id]);
 
-  const canCorrect = n.status === "active" && n.tier !== "episode";
-  const canForget = n.status !== "forgotten";
+  const canCorrect = !readOnly && n.status === "active" && n.tier !== "episode";
+  const canForget = !readOnly && n.status !== "forgotten";
   if (!canCorrect && !canForget) return null;
   const saved = dev ? draft.trim() : toStored(draft);
 

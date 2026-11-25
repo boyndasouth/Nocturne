@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { providers, supabase, type Provider } from "../auth";
+import { demoAvailable, emailLinks, providers, setDemo, supabase, type Provider } from "../auth";
 
 type Mode = "link" | "password" | "create";
 const PROVIDER_NAME: Record<Provider, string> = { github: "GitHub", google: "Google" };
 
 export function SignIn() {
-  const [mode, setMode] = useState<Mode>("link");
+  const [mode, setMode] = useState<Mode>(emailLinks ? "link" : "password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -132,9 +132,11 @@ export function SignIn() {
                   <button type="button" className="link-button" onClick={() => setMode("create")}>
                     Create an account
                   </button>
-                  <button type="button" className="link-button" onClick={() => setMode("link")}>
-                    Email me a link instead
-                  </button>
+                  {emailLinks && (
+                    <button type="button" className="link-button" onClick={() => setMode("link")}>
+                      Email me a link instead
+                    </button>
+                  )}
                 </>
               ) : (
                 <button type="button" className="link-button" onClick={() => setMode("password")}>
@@ -143,6 +145,14 @@ export function SignIn() {
               )}
             </p>
           </form>
+        )}
+        {demoAvailable && (
+          <div className="signin-demo">
+            <button type="button" className="ghost wide" onClick={() => setDemo(true)}>
+              Explore a demo memory
+            </button>
+            <p className="fine">No account needed. Read-only.</p>
+          </div>
         )}
         <p className="fine signin-foot">
           Your memory is private to your account. Building an assistant? Turn on developer details

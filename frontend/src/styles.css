@@ -308,6 +308,38 @@ nav {
   min-height: 0;
   overflow: hidden;
 }
+.stage-view {
+  height: 100%;
+  min-height: 0;
+}
+.stage.has-banner {
+  display: flex;
+  flex-direction: column;
+}
+.stage.has-banner .stage-view {
+  flex: 1;
+  height: auto;
+}
+.demo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--night-2);
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--theme);
+}
+.demo-banner p {
+  font-family: var(--serif);
+  font-size: var(--t-m);
+  max-width: 48rem;
+}
+.demo-banner .primary {
+  padding: 0.4rem 0.9rem;
+  font-size: var(--t-xs);
+}
 .stage-msg {
   padding: 3rem 2rem;
   max-width: 36rem;
@@ -557,6 +589,13 @@ nav {
   max-height: 10rem;
   padding: 0.7rem 0.9rem;
   field-sizing: content;
+}
+.composer {
+  flex-wrap: wrap;
+}
+.composer-note {
+  flex-basis: 100%;
+  margin-top: -0.15rem;
 }
 .composer .primary {
   height: 44px;
@@ -1289,6 +1328,12 @@ details.read .quotes {
 }
 .signin-switch .link-button {
   font-size: var(--t-s);
+}
+.signin-demo {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
 }
 .signin-foot {
   margin-top: 1rem;

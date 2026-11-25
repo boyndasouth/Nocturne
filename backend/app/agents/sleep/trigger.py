@@ -17,6 +17,7 @@ from app.agents.sleep.runner import SleepRunner
 from app.memory.cycles import SleepBusy
 from app.memory.store import MemoryStore
 from app.owner import current_owner, owner_scope
+from app.usage import Guard
 
 log = logging.getLogger("nocturne.sleep")
 
@@ -59,11 +60,13 @@ class IdleTrigger:
         store: MemoryStore,
         activity: ActivityClock,
         policy: TriggerPolicy,
+        guard: Guard | None = None,
     ) -> None:
         self._runner = runner
         self._store = store
         self._activity = activity
         self._policy = policy
+        self._guard = guard
         self._task: asyncio.Task[None] | None = None
         self._failures: dict[str, int] = {}
         self._next_try: dict[str, float] = {}
@@ -83,7 +86,9 @@ class IdleTrigger:
 
     async def tick(self) -> bool:
         """One check across every owner with waiting turns, one cycle at a time. Returns True
-        if a cycle ran (successfully or not)."""
+        if a cycle ran (successfully or not). Nothing runs once today's sleep budget is spent."""
+        if self._guard is not None and await self._guard.sleep_spent():
+            return False
         ran = False
         for owner, pending in (await self._store.pending_by_owner()).items():
             with owner_scope(owner):

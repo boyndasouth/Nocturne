@@ -36,6 +36,22 @@ class Settings(BaseSettings):
     # then the account is 'local'. Only the eval harness turns this off; its disposable
     # database holds a single memory and stays byte-for-byte comparable with older runs.
     memory_isolation: bool = True
+
+    # Daily limits that protect the free LLM quotas in a public deployment (0 = no limit).
+    # Per account, applied only with accounts on: messages, and sleeps started by hand.
+    limit_chats_per_day: int = Field(30, ge=0)
+    limit_sleeps_per_day: int = Field(3, ge=0)
+    # Across everyone, per UTC day. Keep them under the providers' free quotas (Groq's is a
+    # rolling 24h, so leave a margin). Past the answer budget, the sleep model answers.
+    answer_tokens_per_day: int = Field(180_000, ge=0)
+    sleep_requests_per_day: int = Field(450, ge=0)
+    answer_fallback: bool = Field(
+        True,
+        description="Answer with the sleep model when the chat model's budget or quota is spent.",
+    )
+    # A read-only memory anyone can explore without signing in (accounts on). Fill it with
+    # `python -m scripts.demo_seed <url> --owner demo`.
+    demo_owner: str | None = None
     cors_origins: str = Field(
         "http://localhost:5173,http://127.0.0.1:5173",
         description="Comma-separated browser origins allowed to call the API (the frontend's"
@@ -77,6 +93,7 @@ class Settings(BaseSettings):
     embedding_backend: Literal["fastembed", "hash"] = "fastembed"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_cache_dir: str | None = None  # default: fastembed's cache in the temp dir
+    embedding_threads: int | None = None  # ONNX Runtime threads; 1 uses the least memory
     embedding_dim: int = 384  # must match vector(N) in migrations/001_init.sql
 
     # --- Tracing (Langfuse); disabled when keys are absent ------------------------------------

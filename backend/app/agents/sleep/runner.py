@@ -30,6 +30,7 @@ from app.llm.tracing import Tracer
 from app.memory.cycles import CycleStore, SleepBusy, SleepCycle
 from app.memory.store import MemoryStore
 from app.owner import current_owner
+from app.usage import SLEEP, UsageStore
 
 log = logging.getLogger("nocturne.sleep")
 
@@ -76,8 +77,10 @@ class SleepRunner:
         config: SleepConfig,
         limits: RunnerLimits,
         tracer: Tracer | None = None,
+        usage: UsageStore | None = None,
     ) -> None:
         self._store = store
+        self._usage = usage  # counts each cycle's model calls against the daily budget
         self._cycles = cycles
         self._embedder = embedder
         self._llm_factory = llm_factory
@@ -184,6 +187,7 @@ class SleepRunner:
         finally:
             self._busy.discard(owner)
             self._tracer.flush()
+            await self._record_usage(cycle)
         done = await self._cycles.get(cycle_id)
         assert done is not None
         log.info(
@@ -201,6 +205,21 @@ class SleepRunner:
             "-" if done.audit_score is None else f"{done.audit_score:.2f}",
         )
         return done
+
+    async def _record_usage(self, started: SleepCycle) -> None:
+        """Add this attempt's model calls (the cycle row is cumulative across resumes)."""
+        if self._usage is None:
+            return
+        try:
+            now = await self._cycles.get(started.cycle_id)
+            if now is not None:
+                await self._usage.add_budget(
+                    SLEEP,
+                    requests=now.llm_calls - started.llm_calls,
+                    tokens=now.tokens_used - started.tokens_used,
+                )
+        except Exception:  # accounting must never fail a cycle
+            log.warning("couldn't record sleep usage for %s", started.cycle_id, exc_info=True)
 
     async def run_once(self, *, clock: datetime | None = None) -> SleepCycle | None:
         prepared = await self.begin(clock=clock)

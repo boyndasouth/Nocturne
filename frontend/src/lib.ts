@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import type { Client, Connection, LinkType, Note } from "./api";
+import type { Client, Connection, LinkType, Me, Note } from "./api";
 import { toYou } from "./voice";
 
 // --- app context ---------------------------------------------------------------------------
@@ -13,6 +13,10 @@ export interface AppCtx {
   bump: () => void;
   /** Developer details: stored wording, ids, scores and costs. */
   dev: boolean;
+  /** Who is signed in and today's limits; null until loaded. */
+  me: Me | null;
+  /** Exploring the read-only demo memory: no chat, sleep, correct or forget. */
+  readOnly: boolean;
 }
 
 export const Ctx = createContext<AppCtx | null>(null);

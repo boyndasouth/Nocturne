@@ -1,5 +1,5 @@
 // Typed client for the Nocturne backend. Shapes mirror backend/app/api/*.py.
-import { accessToken, authEnabled } from "./auth";
+import { accessToken, authEnabled, demoActive } from "./auth";
 
 export type Tier = "episode" | "fact" | "theme";
 export type Status = "active" | "superseded" | "archived" | "forgotten";
@@ -148,6 +148,7 @@ export interface ChatResponse {
   retrieved: { id: string; tier: Tier; score: number; preview: string }[];
   episode_id: string;
   trace?: AnswerTrace;
+  chats_left?: number | null;
 }
 
 export interface ForgetResult {
@@ -180,6 +181,7 @@ export interface MemoryTrace {
 
 export interface AnswerTrace {
   model: string;
+  fallback?: boolean;
   input_tokens: number;
   output_tokens: number;
   latency_ms: number;
@@ -193,6 +195,11 @@ export interface Me {
   auth_mode: "none" | "supabase";
   owner: string;
   email: string | null;
+  demo: boolean;
+  chats_left: number | null;
+  chats_per_day: number | null;
+  sleeps_left: number | null;
+  sleeps_per_day: number | null;
 }
 
 // --- connection settings ------------------------------------------------------------------
@@ -235,7 +242,7 @@ export class ApiError extends Error {
   }
 }
 
-const sentence = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}.`;
+const sentence = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}${/[.!?]$/.test(s) ? "" : "."}`;
 
 export function explain(err: unknown, conn: Connection): string {
   if (err instanceof ApiError) {
@@ -243,11 +250,11 @@ export function explain(err: unknown, conn: Connection): string {
       return authEnabled
         ? "Your session has ended. Sign in again."
         : "The API key was refused. Enter the backend's API_KEY in Settings.";
-    if (err.status === 403) return "This account can't do that.";
+    if (err.status === 403 || err.status === 429) return sentence(err.message);
     if (err.status === 404) return "Not found. It may belong to a different database.";
     if (err.status === 409) return sentence(err.message);
-    if (err.status === 502 || err.status === 503)
-      return `The backend couldn't reach its language model: ${err.message}`;
+    if (err.status === 503) return sentence(err.message);
+    if (err.status === 502) return `The backend couldn't reach its language model: ${err.message}`;
     return `The backend answered ${err.status}: ${err.message}`;
   }
   return `Can't reach the backend at ${conn.url}. Check the URL in Settings, that the server is running, and that CORS_ORIGINS includes ${window.location.origin}.`;
@@ -261,6 +268,7 @@ export function client(conn: Connection, onUnauthorized?: () => void) {
     if (authEnabled) {
       const token = await accessToken();
       if (token) headers.Authorization = `Bearer ${token}`;
+      else if (demoActive()) headers["X-Nocturne-Demo"] = "1";
     } else if (conn.apiKey) headers["X-API-Key"] = conn.apiKey;
     if (init?.body) headers["Content-Type"] = "application/json";
     const res = await fetch(base + path, { ...init, headers });
@@ -272,7 +280,7 @@ export function client(conn: Connection, onUnauthorized?: () => void) {
       } catch {
         // not JSON
       }
-      if (res.status === 401 && authEnabled) onUnauthorized?.();
+      if (res.status === 401 && authEnabled && !demoActive()) onUnauthorized?.();
       throw new ApiError(res.status, detail);
     }
     return (await res.json()) as T;

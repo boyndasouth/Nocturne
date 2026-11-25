@@ -87,7 +87,8 @@ irm localhost:8000/sleep/cycles -Headers $h      # what each cycle did, tokens s
 Without `?wait=true`, `/sleep` returns 202 and runs in the background. You rarely need to call
 it: the server sleeps on its own after `SLEEP_IDLE_MINUTES` idle (with at least
 `SLEEP_IDLE_MIN_EPISODES` pending) or once `SLEEP_BACKLOG_EPISODES` pile up. After deploy, the
-`Sleep cron` workflow covers the hours when the free host is asleep (setup notes in the file).
+`Sleep cron` workflow covers the hours when the free host is asleep. Deploying (Supabase,
+Render, Vercel, GitHub Actions, all free) is step by step in [DEPLOY.md](DEPLOY.md).
 
 For benchmark replay, pass `{"occurred_at": "..."}` to `/sleep` as well as `/chat`: facts are
 recorded at that time, so replayed questions can't see facts from the future.

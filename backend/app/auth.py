@@ -30,6 +30,7 @@ class Principal:
     owner: str  # Supabase user id, or 'local' with accounts off
     email: str | None = None
     service: bool = False  # the cron's service key: may act across accounts
+    read_only: bool = False  # a visitor exploring the demo memory
 
 
 class SupabaseVerifier:

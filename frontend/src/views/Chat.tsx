@@ -26,7 +26,10 @@ function loadMsgs(): Msg[] {
 const SUGGESTIONS = ["Where do I live?", "What am I training for?", "What did I get on my midterm?"];
 
 export function Chat() {
-  const { api, conn, bump } = useApp();
+  const { api, conn, bump, me, readOnly, go } = useApp();
+  const [chatsLeft, setChatsLeft] = useState<number | null>(null);
+  useEffect(() => setChatsLeft(me?.chats_left ?? null), [me]);
+  const outOfMessages = chatsLeft === 0;
   const [msgs, setMsgs] = useState<Msg[]>(loadMsgs);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -51,6 +54,7 @@ export function Chat() {
     try {
       const res = await api.chat(t);
       setMsgs((m) => [...m, { role: "assistant", res }]);
+      if (res.chats_left !== undefined) setChatsLeft(res.chats_left);
       bump(); // a new turn is waiting for sleep
     } catch (e) {
       setMsgs((m) => [...m, { role: "error", text: explain(e, conn) }]);
@@ -62,8 +66,24 @@ export function Chat() {
   return (
     <div className={`chat ${open ? "with-drawer" : ""}`}>
       <section className="thread" aria-live="polite">
-        <SinceLastTime />
-        {msgs.length === 0 ? (
+        {!readOnly && <SinceLastTime />}
+        {readOnly ? (
+          <div className="empty-chat">
+            <h1>Chat is for your own memory.</h1>
+            <p>
+              This demo is read-only. See what it learned about the student in Memory, and how each
+              night changed it in Nights. Sign in to talk to it and build a memory of your own.
+            </p>
+            <div className="suggestions">
+              <button className="primary" onClick={() => go("memory")}>
+                Open the demo memory
+              </button>
+              <button className="ghost" onClick={() => go("nights")}>
+                See its nights
+              </button>
+            </div>
+          </div>
+        ) : msgs.length === 0 ? (
           <div className="empty-chat">
             <h1>Tell it about your life. Ask it later.</h1>
             <p>
@@ -102,30 +122,44 @@ export function Chat() {
           </ol>
         )}
         <div ref={end} />
-        <form
-          className="composer"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void send(draft);
-          }}
-        >
-          <textarea
-            value={draft}
-            rows={1}
-            placeholder="Write a message"
-            aria-label="Message"
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send(draft);
-              }
+        {!readOnly && (
+          <form
+            className="composer"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send(draft);
             }}
-          />
-          <button type="submit" className="primary" disabled={busy || !draft.trim()}>
-            Send
-          </button>
-        </form>
+          >
+            <textarea
+              value={draft}
+              rows={1}
+              disabled={outOfMessages}
+              placeholder={outOfMessages ? "You've used today's messages" : "Write a message"}
+              aria-label="Message"
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send(draft);
+                }
+              }}
+            />
+            <button
+              type="submit"
+              className="primary"
+              disabled={busy || !draft.trim() || outOfMessages}
+            >
+              Send
+            </button>
+            {chatsLeft !== null && me?.chats_per_day && (
+              <p className="fine composer-note">
+                {outOfMessages
+                  ? "Messages reset at midnight UTC. Your memory is still yours to explore."
+                  : `${plural(chatsLeft, "message")} left today`}
+              </p>
+            )}
+          </form>
+        )}
       </section>
       {open && (
         <aside className="drawer" aria-label="Cited memory">
@@ -274,6 +308,11 @@ function Trace({ trace, onOpen }: { trace: AnswerTrace; onOpen: (id: string) => 
         Answer trace: {plural(trace.memories.length, "memory", "memories")} retrieved, {inPrompt} in
         the prompt, {trace.memories.filter((m) => m.cited).length} cited
       </summary>
+      {trace.fallback && (
+        <p className="trace-meta">
+          Answered by the fallback model: the chat model's daily budget or quota was spent.
+        </p>
+      )}
       <p className="trace-meta">
         {trace.model}, {trace.input_tokens.toLocaleString()} tokens in,{" "}
         {trace.output_tokens.toLocaleString()} out, {Math.round(trace.latency_ms).toLocaleString()} ms.

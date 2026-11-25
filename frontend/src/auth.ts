@@ -19,6 +19,12 @@ export const providers: Provider[] = ((import.meta.env.VITE_AUTH_PROVIDERS as st
   .map((p) => p.trim().toLowerCase())
   .filter((p): p is Provider => p === "github" || p === "google");
 
+/** Sign-in links by email need your own SMTP in Supabase: its built-in sender only reaches
+ * your team. Off by default, so the page leads with passwords. */
+export const emailLinks = ["1", "true", "yes"].includes(
+  String(import.meta.env.VITE_EMAIL_LINKS ?? "").trim().toLowerCase(),
+);
+
 /** The current access token (supabase-js refreshes it before it expires). */
 export async function accessToken(): Promise<string | null> {
   if (!supabase) return null;
@@ -27,3 +33,29 @@ export async function accessToken(): Promise<string | null> {
 }
 
 export type { Session };
+
+// --- the read-only demo memory ------------------------------------------------------------
+
+/** The sign-in page offers it when the build says the backend has one (DEMO_OWNER). */
+export const demoAvailable = ["1", "true", "yes"].includes(
+  String(import.meta.env.VITE_DEMO ?? "").trim().toLowerCase(),
+);
+const DEMO_KEY = "nocturne.demo";
+
+export function demoActive(): boolean {
+  try {
+    return demoAvailable && sessionStorage.getItem(DEMO_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setDemo(on: boolean): void {
+  try {
+    if (on) sessionStorage.setItem(DEMO_KEY, "1");
+    else sessionStorage.removeItem(DEMO_KEY);
+  } catch {
+    // demo only for this page view
+  }
+  window.dispatchEvent(new Event("nocturne-demo"));
+}

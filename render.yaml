@@ -1,0 +1,40 @@
+# Render Blueprint: New → Blueprint → pick this repo. Creates the Nocturne API on the free
+# plan. Values marked sync: false are asked for once in the dashboard (see DEPLOY.md).
+services:
+  - type: web
+    name: nocturne-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL # Supabase → Connect → Session pooler URI
+        sync: false
+      - key: AUTH_MODE
+        value: supabase
+      - key: SUPABASE_URL # https://<project>.supabase.co
+        sync: false
+      - key: API_KEY # the service key; copy it into GitHub as NOCTURNE_API_KEY
+        generateValue: true
+      - key: CORS_ORIGINS # your Vercel URL, e.g. https://nocturne.vercel.app
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DEMO_OWNER
+        value: demo
+      # Fits the free plan's 512 MB: one ONNX Runtime thread for the embedding model.
+      - key: EMBEDDING_THREADS
+        value: "1"
+      # Daily limits that protect the free LLM quotas (0 = no limit).
+      - key: LIMIT_CHATS_PER_DAY
+        value: "30"
+      - key: LIMIT_SLEEPS_PER_DAY
+        value: "3"
+      - key: ANSWER_TOKENS_PER_DAY
+        value: "180000"
+      - key: SLEEP_REQUESTS_PER_DAY
+        value: "450"

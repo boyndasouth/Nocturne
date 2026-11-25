@@ -103,7 +103,9 @@ def test_requests_need_a_valid_supabase_token(accounts):
     assert accounts.get("/memory/notes", headers={"X-API-Key": "service-key"}).status_code == 403
 
     me = accounts.get("/me", headers=auth(ALICE)).json()
-    assert me == {"auth_mode": "supabase", "owner": ALICE, "email": "1111@example.com"}
+    assert me["auth_mode"] == "supabase" and me["owner"] == ALICE and not me["demo"]
+    assert me["email"] == "1111@example.com"
+    assert (me["chats_left"], me["sleeps_left"]) == (30, 3)  # accounts on: per-account limits
 
 
 def test_each_account_sees_only_its_own_memory(accounts):
@@ -196,7 +198,9 @@ def test_accounts_off_is_one_local_memory(make_client):
     client = make_client(sleep_llm=FakeLLM(sleep_brain), enable_auditor=False)
     r = client.post("/chat", json={"message": "I live in Austin", "occurred_at": JAN.isoformat()})
     assert r.status_code == 200
-    assert client.get("/me").json() == {"auth_mode": "none", "owner": "local", "email": None}
+    me = client.get("/me").json()
+    assert (me["auth_mode"], me["owner"], me["email"]) == ("none", "local", None)
+    assert me["chats_left"] is None  # accounts off: no per-account limits
     r = client.post("/sleep/all", params={"wait": "true"})  # local is the only account
     assert r.status_code == 200 and r.json()["started"] == 1
     assert [n["content"] for n in client.get("/memory/notes").json()["items"]] == [

@@ -13,7 +13,7 @@ function summary(c: Cycle): string {
 }
 
 export function Nights({ selected }: { selected: string | null }) {
-  const { api, conn, go, refreshKey, bump } = useApp();
+  const { api, conn, go, refreshKey, bump, readOnly, me } = useApp();
   const cycles = useLoad(() => api.cycles(100), [api, refreshKey]);
   const [notice, setNotice] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -46,9 +46,22 @@ export function Nights({ selected }: { selected: string | null }) {
   return (
     <div className="nights">
       <aside className="night-list" aria-label="Sleep cycles">
-        <button className="primary wide" onClick={() => void sleepNow()} disabled={starting || running}>
-          {running ? "Sleeping" : starting ? "Starting" : "Sleep now"}
-        </button>
+        {!readOnly && (
+          <button
+            className="primary wide"
+            onClick={() => void sleepNow()}
+            disabled={starting || running || me?.sleeps_left === 0}
+          >
+            {running ? "Sleeping" : starting ? "Starting" : "Sleep now"}
+          </button>
+        )}
+        {!readOnly && me?.sleeps_per_day != null && me.sleeps_left != null && (
+          <p className="fine">
+            {me.sleeps_left === 0
+              ? "You've started today's sleeps by hand. The scheduled sleep still runs."
+              : `${me.sleeps_left} of ${me.sleeps_per_day} sleeps by hand left today`}
+          </p>
+        )}
         {notice && (
           <p className="notice" role="status">
             {notice}

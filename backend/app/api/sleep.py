@@ -79,6 +79,19 @@ async def sleep(
     wait: bool = Query(False, description="Run to completion before responding (eval, tests)."),
 ) -> SleepResponse:
     """Trigger a sleep cycle. A failed cycle is resumed before any new work is picked up."""
+    if c.guard is not None:
+        if await c.guard.sleeps_left() == 0:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                f"you've started today's {c.guard.limits.sleeps_per_day} sleeps by hand. Your "
+                "conversations will still be consolidated by the scheduled sleep",
+            )
+        if await c.guard.sleep_spent():
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "the demo has used today's free sleep quota. Your conversations are kept and "
+                "will be consolidated tomorrow (the quota resets at midnight UTC)",
+            )
     try:
         prepared = await c.sleep_runner.begin(clock=req.occurred_at if req else None)
     except SleepBusy as exc:
@@ -87,6 +100,8 @@ async def sleep(
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
     if prepared is None:
         return SleepResponse(status="nothing_to_do")
+    if c.usage is not None:
+        await c.usage.add_account(sleeps=1)
 
     if not wait:
         task = asyncio.create_task(c.sleep_runner.execute(prepared))
@@ -136,6 +151,8 @@ class SleepAllResponse(BaseModel):
 async def _sleep_owners(c: Container, owners: list[str]) -> SleepAllResponse:
     out = SleepAllResponse(waiting=len(owners), started=0, busy=0, failed=0)
     for owner in owners:
+        if c.guard is not None and await c.guard.sleep_spent():
+            break  # the rest wait for tomorrow's budget
         with owner_scope(owner):
             try:
                 prepared = await c.sleep_runner.begin()
@@ -170,6 +187,8 @@ async def sleep_all(
     """Sleep every account that has conversation turns waiting, one after another. For the
     scheduled job, with the service key (X-API-Key). By default it starts in the background
     and answers 202 at once, so a host's request timeout can't cut it short."""
+    if c.guard is not None and await c.guard.sleep_spent():
+        return SleepAllResponse(waiting=0, started=0, busy=0, failed=0)
     owners = sorted(await c.store.pending_by_owner())
     if wait:
         return await _sleep_owners(c, owners)

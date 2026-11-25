@@ -68,6 +68,10 @@ def backend_settings(eval_settings: EvalSettings, *, fake: bool) -> Settings:
         # Unscoped connections: the disposable eval database holds one memory, and this keeps
         # query plans (and so cached runs) identical to runs before accounts existed.
         "memory_isolation": False,
+        # The eval measures the configured models: no fallback answerer, no daily budgets.
+        "answer_fallback": False,
+        "answer_tokens_per_day": 0,
+        "sleep_requests_per_day": 0,
         "responder_temperature": eval_settings.answer_temperature,
     }
     # Never fall back to the app's DATABASE_URL: the eval database is wiped constantly.

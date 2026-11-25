@@ -37,10 +37,13 @@ class FastEmbedEmbedder:
     # query_embed doesn't add it for BGE models, so we do.
     BGE_QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
-    def __init__(self, model_name: str, dim: int, cache_dir: str | None = None) -> None:
+    def __init__(
+        self, model_name: str, dim: int, cache_dir: str | None = None, threads: int | None = None
+    ) -> None:
         self.model_name = model_name
         self.dim = dim
         self._cache_dir = cache_dir
+        self._threads = threads
         self._model: Any = None
         self._lock = threading.Lock()
 
@@ -53,7 +56,9 @@ class FastEmbedEmbedder:
                 if self._model is None:
                     from fastembed import TextEmbedding
 
-                    model = TextEmbedding(self.model_name, cache_dir=self._cache_dir)
+                    model = TextEmbedding(
+                        self.model_name, cache_dir=self._cache_dir, threads=self._threads
+                    )
                     actual = len(next(iter(model.embed(["dimension probe"]))))
                     if actual != self.dim:
                         raise ValueError(
@@ -105,7 +110,10 @@ def build_embedder(settings: Settings) -> Embedder:
     if settings.embedding_backend == "hash":
         return HashEmbedder(settings.embedding_dim)
     return FastEmbedEmbedder(
-        settings.embedding_model, settings.embedding_dim, settings.embedding_cache_dir
+        settings.embedding_model,
+        settings.embedding_dim,
+        settings.embedding_cache_dir,
+        threads=settings.embedding_threads,
     )
 
 

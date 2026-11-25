@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
@@ -40,6 +40,7 @@ from app.llm.tracing import Tracer, build_tracer
 from app.memory.cycles import CycleStore
 from app.memory.retriever import HierarchicalRetriever
 from app.memory.store import MemoryStore
+from app.usage import Guard, Limits, UsageStore
 
 log = logging.getLogger("nocturne")
 
@@ -95,6 +96,21 @@ def create_app(
             tracer=tracer_,
         )
         writer = EpisodeWriter(store, embedder_)
+        # Built lazily: chat works without a sleep key; /sleep then returns 503.
+        sleep_factory: Callable[[], LLMClient] = (
+            (lambda: sleep_llm) if sleep_llm else (lambda: build_sleep_client(settings, tracer_))
+        )
+        usage = UsageStore(pool)
+        guard = Guard(
+            usage,
+            Limits(
+                chats_per_day=settings.limit_chats_per_day or None,
+                sleeps_per_day=settings.limit_sleeps_per_day or None,
+                answer_tokens_per_day=settings.answer_tokens_per_day or None,
+                sleep_requests_per_day=settings.sleep_requests_per_day or None,
+            ),
+            per_account=settings.auth_mode == "supabase",
+        )
         responder = Responder(
             llm=online,
             retriever=retriever,
@@ -109,6 +125,7 @@ def create_app(
             max_tokens=settings.online_max_tokens,
             prompt=settings.responder_prompt,
             temperature=settings.responder_temperature,
+            fallback=sleep_factory if settings.answer_fallback else None,
         )
         cycles = CycleStore(pool)
         activity = ActivityClock()
@@ -116,10 +133,7 @@ def create_app(
             store=store,
             cycles=cycles,
             embedder=embedder_,
-            # Built lazily: chat works without a sleep key; /sleep then returns 503.
-            llm_factory=(lambda: sleep_llm)
-            if sleep_llm
-            else (lambda: build_sleep_client(settings, tracer_)),
+            llm_factory=sleep_factory,
             checkpointer=checkpointer or postgres_checkpointer(settings.database_url),
             config=SleepConfig.from_settings(settings),
             limits=RunnerLimits(
@@ -129,6 +143,7 @@ def create_app(
                 recursion_limit=settings.sleep_recursion_limit,
             ),
             tracer=tracer_,
+            usage=usage,
         )
         trigger = IdleTrigger(
             runner,
@@ -141,6 +156,7 @@ def create_app(
                 poll_seconds=settings.sleep_poll_seconds,
                 retry_backoff_seconds=settings.sleep_retry_backoff_minutes * 60,
             ),
+            guard=guard,
         )
         app.state.container = Container(
             settings=settings,
@@ -156,6 +172,8 @@ def create_app(
             sleep_runner=runner,
             activity=activity,
             verifier=verifier if settings.auth_mode == "supabase" else None,
+            usage=usage,
+            guard=guard,
         )
 
         warmup = getattr(embedder_, "warmup", None)

@@ -3,8 +3,9 @@ It never rewrites long-term memory; only the sleep agent does that."""
 
 from __future__ import annotations
 
+import logging
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import UUID
@@ -17,6 +18,8 @@ from app.memory.excerpt import fit
 from app.memory.models import MemoryNote, ScoredNote, Tier
 from app.memory.retriever import HierarchicalRetriever
 from app.memory.store import MemoryStore
+
+log = logging.getLogger(__name__)
 
 REF_RE = re.compile(r"\[M(\d+)\]")
 
@@ -45,6 +48,7 @@ class ChatResult:
     recent_turns: int = 0
     history_notes: int = 0
     model: str = ""
+    answered_by: str = "primary"  # or "fallback": the sleep model answered
     input_tokens: int = 0
     output_tokens: int = 0
     latency_ms: float = 0.0
@@ -152,12 +156,16 @@ class Responder:
         context_item_max_chars: int = CONTEXT_ITEM_MAX_CHARS,
         prompt: str = "v1",
         temperature: float = 0.2,
+        fallback: Callable[[], LLMClient] | None = None,
     ) -> None:
+        """`fallback` builds (lazily) a second model that answers when this one can't."""
         self._system = responder_system(prompt)
         self._temperature = temperature
         self._budget = context_budget_chars
         self._item_max = context_item_max_chars
         self._llm = llm
+        self._fallback_factory = fallback
+        self._fallback: LLMClient | None = None
         self._retriever = retriever
         self._store = store
         self._writer = writer
@@ -167,12 +175,29 @@ class Responder:
         self._kappa = reinforce_kappa
         self._max_tokens = max_tokens
 
+    def _fallback_llm(self) -> LLMClient | None:
+        if self._fallback is None and self._fallback_factory is not None:
+            try:
+                self._fallback = self._fallback_factory()
+            except Exception:  # no sleep key configured: no fallback
+                log.warning("no fallback answer model available", exc_info=True)
+                self._fallback_factory = None
+        return self._fallback
+
     async def respond(
-        self, message: str, *, occurred_at: datetime | None = None, remember: bool = True
+        self,
+        message: str,
+        *,
+        occurred_at: datetime | None = None,
+        remember: bool = True,
+        prefer_fallback: bool = False,
     ) -> ChatResult:
         """`remember=False` answers without side effects: no episode is written and no note
         is reinforced. The eval harness uses it so benchmark questions don't become memories
-        (LoCoMo asks ~200 questions per conversation) or shift strength-based scoring."""
+        (LoCoMo asks ~200 questions per conversation) or shift strength-based scoring.
+
+        With a fallback model configured, it answers when the chat model fails (quota, outage)
+        or when `prefer_fallback` says the chat model's daily budget is spent."""
         now = occurred_at or datetime.now(UTC)
         with self._tracer.observe("chat", as_type="agent", input={"message": message}) as obs:
             retrieved = await self._retriever.retrieve(message, now=now, as_of=occurred_at)
@@ -202,18 +227,36 @@ class Responder:
                     ),
                 },
             ]
-            try:
-                resp = await self._llm.chat(
-                    messages,
-                    temperature=self._temperature,
-                    max_tokens=self._max_tokens,
-                    trace_name="responder",
+            fallback = self._fallback_llm()
+            order = [("primary", self._llm)]
+            if fallback is not None:
+                order = (
+                    [("fallback", fallback)]
+                    if prefer_fallback
+                    else [*order, ("fallback", fallback)]
                 )
-            except LLMError:
+            failure: LLMError | None = None
+            for answered_by, llm in order:
+                try:
+                    resp = await llm.chat(
+                        messages,
+                        temperature=self._temperature,
+                        max_tokens=self._max_tokens,
+                        trace_name="responder"
+                        if answered_by == "primary"
+                        else "responder.fallback",
+                    )
+                    break
+                except LLMError as exc:
+                    failure = exc
+                    if answered_by == "primary" and fallback is not None:
+                        log.warning("chat model failed (%s); answering with the fallback", exc)
+            else:
                 # Never lose user input: log the turn without an answer, then surface the error.
                 if remember:
                     await self._writer.write_turn(message, None, occurred_at=now)
-                raise
+                assert failure is not None
+                raise failure
 
             citations = extract_citations(resp.text, refmap)
             episode_id: UUID | None = None
@@ -242,6 +285,7 @@ class Responder:
                 recent_turns=len(recent),
                 history_notes=sum(len(v) for v in history.values()),
                 model=resp.model,
+                answered_by=answered_by,
                 input_tokens=resp.input_tokens,
                 output_tokens=resp.output_tokens,
                 latency_ms=resp.latency_ms,

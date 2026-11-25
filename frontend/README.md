@@ -50,15 +50,23 @@ With accounts on, everyone who signs in gets a private memory. The backend check
 request's Supabase token, and Postgres row-level security keeps every query, including the
 sleep agent's, inside that person's rows. With accounts off it's one memory, as before.
 
-1. In Supabase, open **Authentication → Providers**: Email is on by default (sign-in links
-   and passwords). Optionally enable GitHub or Google and list them in `VITE_AUTH_PROVIDERS`.
+1. In Supabase, **Authentication → Sign In / Providers → Email**: keep it enabled and turn
+   **Confirm email** off. The built-in mailer only reaches your own team, so the sign-in page
+   leads with passwords; set `VITE_EMAIL_LINKS=1` once you have your own SMTP. Optionally
+   enable GitHub or Google and list them in `VITE_AUTH_PROVIDERS`.
 2. **Authentication → URL Configuration**: set the Site URL to the frontend's address and add
    it (and `http://localhost:5173` for local use) under Redirect URLs.
 3. Frontend `.env.local` (or Vercel environment variables): `VITE_SUPABASE_URL` and
-   `VITE_SUPABASE_ANON_KEY` from **Project Settings → API**. The anon/publishable key is
-   meant for browsers; never use the service_role key here.
+   `VITE_SUPABASE_ANON_KEY` from **Settings → API Keys** (the Project URL and the publishable
+   key, which is meant for browsers; never use a secret or service_role key here).
 4. Backend `.env`: `AUTH_MODE=supabase`, `SUPABASE_URL`, and a long random `API_KEY` (the
    service key the scheduled job uses for `POST /sleep/all`). Run `python -m scripts.migrate`.
+5. Optional demo: `DEMO_OWNER=demo` in the backend, `VITE_DEMO=1` in the frontend, and
+   `python -m scripts.demo_seed <url> --owner demo`. Visitors can then explore that memory
+   read-only without signing up.
+
+With accounts on, each account gets 30 messages and 3 manual sleeps a day, and everyone
+shares a daily budget for each model (see `backend/.env.example`). The chat shows what's left.
 
 Existing memory belongs to the account `local`. To fill a signed-in account with the demo,
 use its user id (Authentication → Users): `python -m scripts.demo_seed <url> --owner <id>`.
@@ -67,8 +75,9 @@ use its user id (Authentication → Users): `python -m scripts.demo_seed <url> -
 retrieval found, its score and how it was reached, which ones made it into the prompt and
 were cited, and the exact prompt the model saw.
 
-## Deploy (Vercel)
+## Deploy
 
-Root directory `frontend`, framework preset Vite, environment variables `VITE_API_URL` = the
+The whole deployment (Supabase, Render, Vercel, GitHub Actions) is in [DEPLOY.md](../DEPLOY.md).
+For the frontend alone: root directory `frontend`, framework preset Vite, environment variables `VITE_API_URL` = the
 backend URL, plus the `VITE_SUPABASE_*` ones above for accounts. Then add the Vercel URL to the backend's `CORS_ORIGINS`. Routing is hash-based,
 so no rewrites are needed.

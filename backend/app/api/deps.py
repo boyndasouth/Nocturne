@@ -21,6 +21,7 @@ from app.memory.cycles import CycleStore
 from app.memory.retriever import HierarchicalRetriever
 from app.memory.store import MemoryStore
 from app.owner import LOCAL_OWNER, set_owner
+from app.usage import Guard, UsageStore
 
 
 @dataclass
@@ -38,6 +39,8 @@ class Container:
     sleep_runner: SleepRunner
     activity: ActivityClock
     verifier: SupabaseVerifier | None = None  # set when AUTH_MODE=supabase
+    usage: UsageStore | None = None
+    guard: Guard | None = None
 
 
 def get_container(request: Request) -> Container:
@@ -58,6 +61,7 @@ async def authenticate(
     request: Request,
     container: ContainerDep,
     x_api_key: Annotated[str | None, Header()] = None,
+    x_nocturne_demo: Annotated[str | None, Header()] = None,
     bearer: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
 ) -> Principal:
     """Who is calling, and whose memory every query in this request touches.
@@ -65,7 +69,8 @@ async def authenticate(
     AUTH_MODE=none: one memory ('local'); X-API-Key is required only if API_KEY is set.
     AUTH_MODE=supabase: a Supabase access token (Authorization: Bearer) selects the user's
     own memory. The service key (X-API-Key = API_KEY) is accepted only where an endpoint
-    asks for it (the cron's POST /sleep/all).
+    asks for it (the cron's POST /sleep/all). With DEMO_OWNER set, `X-Nocturne-Demo: 1` and
+    no token reads that memory, read-only.
     """
     s = container.settings
     if s.auth_mode == "none":
@@ -82,9 +87,16 @@ async def authenticate(
             ) from exc
     elif s.api_key is not None and _key_matches(x_api_key, s.api_key.get_secret_value()):
         principal = Principal(owner="", service=True)
+    elif x_nocturne_demo == "1" and s.demo_owner:
+        principal = Principal(owner=s.demo_owner, read_only=True)
     else:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "sign in first", headers={"WWW-Authenticate": "Bearer"}
+        )
+    if principal.read_only and request.method not in ("GET", "HEAD", "OPTIONS"):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "this demo memory is read-only. Sign in to chat with a memory of your own",
         )
     if not principal.service:
         set_owner(principal.owner)  # scopes every connection this request (and its tasks) use

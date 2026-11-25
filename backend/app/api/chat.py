@@ -7,10 +7,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from app.api.deps import ContainerDep, require_user
-from app.llm.client import LLMError
+from app.llm.client import LLMError, QuotaExhaustedError
 from app.memory.models import Status, Tier
+from app.usage import ANSWER, SLEEP
 
 router = APIRouter(tags=["chat"], dependencies=[Depends(require_user)])
+
+QUOTA_SPENT = (
+    "the demo has used today's free model quota. Your message was kept; try again tomorrow "
+    "(the quota resets at midnight UTC)"
+)
 
 
 class ChatRequest(BaseModel):
@@ -60,6 +66,7 @@ class AnswerTrace(BaseModel):
     """Why the assistant answered as it did: for developers debugging memory."""
 
     model: str
+    fallback: bool = Field(False, description="The chat model's budget or quota was spent")
     input_tokens: int
     output_tokens: int
     latency_ms: float
@@ -75,19 +82,46 @@ class ChatResponse(BaseModel):
     retrieved: list[RetrievedOut]
     episode_id: UUID
     trace: AnswerTrace
+    chats_left: int | None = Field(None, description="Messages this account has left today")
 
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest, c: ContainerDep) -> ChatResponse:
     c.activity.touch()
+    prefer_fallback = False
+    if c.guard is not None:
+        if await c.guard.chats_left() == 0:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                f"you've sent today's {c.guard.limits.chats_per_day} messages. You can explore "
+                "your memory meanwhile; messages reset at midnight UTC",
+            )
+        prefer_fallback = await c.guard.answer_spent()
+        if prefer_fallback and (not c.settings.answer_fallback or await c.guard.sleep_spent()):
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, QUOTA_SPENT)
     try:
-        result = await c.responder.respond(req.message, occurred_at=req.occurred_at)
+        result = await c.responder.respond(
+            req.message, occurred_at=req.occurred_at, prefer_fallback=prefer_fallback
+        )
+    except QuotaExhaustedError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, QUOTA_SPENT) from exc
     except LLMError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"LLM provider error: {exc}") from exc
+    chats_left: int | None = None
+    if c.usage is not None:
+        await c.usage.add_account(chats=1)
+        await c.usage.add_budget(
+            ANSWER if result.answered_by == "primary" else SLEEP,
+            requests=1,
+            tokens=result.input_tokens + result.output_tokens,
+        )
+    if c.guard is not None:
+        chats_left = await c.guard.chats_left()
     assert result.episode_id is not None  # remember=True always writes the turn
     cited = {ci.note_id for ci in result.citations}
     trace = AnswerTrace(
         model=result.model,
+        fallback=result.answered_by == "fallback",
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
         latency_ms=round(result.latency_ms, 1),
@@ -114,6 +148,7 @@ async def chat(req: ChatRequest, c: ContainerDep) -> ChatResponse:
         messages=[PromptMessage(role=m["role"], content=m["content"]) for m in result.messages],
     )
     return ChatResponse(
+        chats_left=chats_left,
         trace=trace,
         answer=result.answer,
         citations=[CitationOut(ref=ci.ref, note_id=ci.note_id) for ci in result.citations],
