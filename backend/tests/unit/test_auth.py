@@ -69,3 +69,27 @@ async def test_legacy_shared_secret_projects():
     without = SupabaseVerifier(URL, jwks={"keys": []})
     with pytest.raises(AuthError, match="SUPABASE_JWT_SECRET"):
         await without.verify(_token(secret, "x", alg="HS256"))
+
+
+async def test_a_freshly_booted_machine_still_fetches_and_rotates(monkeypatch):
+    """time.monotonic() starts near 0 on a new machine (CI runners, a just-started
+    container). The first token must still fetch the keys, and a rotation right after must
+    still be picked up."""
+    clock = [3.0]
+    monkeypatch.setattr("app.auth.time.monotonic", lambda: clock[0])
+    old, new = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
+    served = {"keys": [_jwk(old, "old")]}
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        return httpx.Response(200, json=served)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        v = SupabaseVerifier(URL, http=http)
+        assert (await v.verify(_token(old, "old"))).owner == "u1"
+        assert len(calls) == 1  # fetched by the cache, not by the unknown-key path
+        clock[0] = 5.0
+        served = {"keys": [_jwk(old, "old"), _jwk(new, "new")]}
+        assert (await v.verify(_token(new, "new"))).owner == "u1"
+        assert len(calls) == 2

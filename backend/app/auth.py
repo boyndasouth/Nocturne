@@ -48,7 +48,7 @@ class SupabaseVerifier:
         self.audience = audience
         self._secret = jwt_secret
         self._keys: dict[str, jwt.PyJWK] = {}
-        self._fetched_at = 0.0
+        self._fetched_at = float("-inf")  # never: the first token always fetches
         self._forced_at = float("-inf")  # last refetch for an unknown key
         self._fixed = jwks is not None
         if jwks is not None:
