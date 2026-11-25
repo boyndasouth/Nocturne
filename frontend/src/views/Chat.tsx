@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import Markdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { explain, type AnswerTrace, type ChatResponse } from "../api";
 import { day, episodeQuote, plural, store, stored, tierName, useApp, useLoad, useText } from "../lib";
 import { NotePanel } from "../components/NotePanel";
@@ -144,31 +149,53 @@ function Answer({
   const { dev } = useApp();
   const byRef = new Map(res.citations.map((c) => [c.ref, c.note_id]));
   const order = [...byRef.keys()];
-  const parts: ReactNode[] = [];
-  let last = 0;
-  for (const m of res.answer.matchAll(/\[(M\d+)\]/g)) {
-    const id = byRef.get(m[1]);
-    parts.push(res.answer.slice(last, m.index));
-    if (id) {
-      parts.push(
-        <button
-          key={m.index}
-          className="cite"
-          aria-pressed={active === id}
-          onClick={() => onCite(id)}
-          title="Show this memory"
-        >
-          {order.indexOf(m[1]) + 1}
-        </button>,
+  const source = res.answer
+    // Citations become links the renderer turns back into buttons.
+    .replace(/\[(M\d+)\]/g, (whole, ref: string) =>
+      byRef.has(ref) ? `[${order.indexOf(ref) + 1}](#cite-${ref})` : whole,
+    )
+    // remark-math only knows $…$ and $$…$$; models often write \(…\) and \[…\].
+    .replace(/\\\[([\s\S]+?)\\\]/g, (_, m: string) => `\n$$\n${m.trim()}\n$$\n`)
+    .replace(/\\\(([\s\S]+?)\\\)/g, (_, m: string) => `$${m.trim()}$`);
+
+  const components: Components = {
+    a({ href, children }) {
+      const ref = href?.startsWith("#cite-") ? href.slice(6) : null;
+      const id = ref ? byRef.get(ref) : undefined;
+      if (id) {
+        return (
+          <button
+            className="cite"
+            aria-pressed={active === id}
+            onClick={() => onCite(id)}
+            title="Show this memory"
+          >
+            {children}
+          </button>
+        );
+      }
+      return (
+        <a href={href} target="_blank" rel="noreferrer">
+          {children}
+        </a>
       );
-    } else parts.push(m[0]);
-    last = (m.index ?? 0) + m[0].length;
-  }
-  parts.push(res.answer.slice(last));
+    },
+    table({ children }) {
+      return (
+        <div className="table-wrap">
+          <table>{children}</table>
+        </div>
+      );
+    },
+  };
 
   return (
     <>
-      <p className="answer">{parts}</p>
+      <div className="answer">
+        <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={components}>
+          {source}
+        </Markdown>
+      </div>
       {dev && res.trace ? (
         <Trace trace={res.trace} onOpen={onCite} />
       ) : res.retrieved.length > 0 && (
