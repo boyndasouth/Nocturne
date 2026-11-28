@@ -11,6 +11,84 @@ themes, their facts, one hop of links, and what was true at the time a question 
 about. A benchmark harness compares it against baselines. Next: Phase 4 (full evaluation,
 UI, deploy).
 
+## Architecture
+
+```mermaid
+flowchart LR
+    User(["User"])
+
+    subgraph Web["Web app · React + Vite · Vercel"]
+        UI["Chat · Memory explorer · Nights"]
+    end
+
+    Auth["Supabase Auth"]
+
+    subgraph API["FastAPI backend · Render"]
+        direction TB
+        Endpoints["/chat · /ingest · /memory · /sleep"]
+
+        subgraph Online["Online path · per message"]
+            direction TB
+            Writer["Episode Writer<br/>raw turn → episode, no LLM"]
+            Retriever["Retriever<br/>hybrid search → themes → facts → 1 link hop<br/>time-window aware"]
+            Responder["Responder<br/>current facts + what they replaced"]
+        end
+
+        Trigger["Sleep trigger<br/>idle / backlog"]
+
+        subgraph Sleep["Offline path · sleep cycle (LangGraph, checkpointed)"]
+            direction TB
+            Extractor["Extractor"] --> Dedup["Deduplicator"] --> Contra["Contradiction Resolver"]
+            Contra --> Linker["Linker"] --> Abstractor["Abstractor"]
+            Abstractor --> Apply["Apply + Forgetter<br/>one transaction"] --> Auditor["Auditor"]
+        end
+
+        Embed["bge-small embeddings<br/>ONNX, in-process"]
+    end
+
+    subgraph DB["Postgres + pgvector · Supabase"]
+        Notes[("episodes · facts · themes<br/>links · versions")]
+        Cycles[("sleep_cycles<br/>LangGraph checkpoints")]
+    end
+
+    subgraph LLMs["LLM providers"]
+        Groq["Groq<br/>answers"]
+        Gemini["Gemini<br/>sleep + fallback answers"]
+    end
+
+    Cron["GitHub Actions<br/>sleep cron"]
+    Langfuse["Langfuse<br/>traces (optional)"]
+
+    User --> UI
+    UI -- "sign in" --> Auth
+    UI -- "JWT" --> Endpoints
+    Endpoints --> Writer
+    Endpoints --> Retriever
+    Retriever --> Responder
+    Writer --> Notes
+    Retriever --> Notes
+    Responder --> Groq
+    Responder -. "quota spent" .-> Gemini
+    Writer --> Embed
+    Retriever --> Embed
+
+    Endpoints --> Trigger
+    Cron -- "POST /sleep" --> Endpoints
+    Trigger --> Extractor
+    Notes -- "new episodes" --> Extractor
+    Apply -- "facts, merges, supersessions,<br/>links, themes, archives" --> Notes
+    Sleep --> Gemini
+    Sleep --> Cycles
+
+    Groq -.-> Langfuse
+    Gemini -.-> Langfuse
+```
+
+Each message is stored as an episode, answered from retrieved memory, and left for the sleep
+cycle. Between sessions, the sleep cycle turns episodes into facts, merges duplicates,
+supersedes contradicted facts while keeping their history, links related facts and groups
+them into themes, forgets what has decayed, and audits its own decisions.
+
 ## What works now
 
 | Piece | Where |
